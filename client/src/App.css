@@ -1,0 +1,1084 @@
+:root {
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --border: #cbd5e1;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --debt-bg: #fee2e2;
+  --debt-border: #fca5a5;
+  --pay-bg: #dcfce7;
+  --pay-border: #bbf7d0;
+  --owe: #dc2626;
+  --ok: #16a34a;
+  --expense-bg: #fef9c3;
+  --expense-border: #fde68a;
+  --expense-text: #854d0e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Naskh Arabic", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+.top h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.sub {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ─── تابەکان ─── */
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.tabs button {
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tabs button svg {
+  flex-shrink: 0;
+}
+
+.tabs button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+}
+
+.tabs button:hover:not(.on) {
+  border-color: var(--muted);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+/* ─── کارتەکان ─── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tab-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tab-panels > .card {
+  margin-top: 0.75rem;
+}
+
+.tab-panels > .card:first-child {
+  margin-top: 1rem;
+}
+
+.card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.hint-inline {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.85rem;
+}
+
+button.name-link {
+  background: none;
+  border: none;
+  padding: 0.35rem 0.15rem;
+  min-height: 2.25rem;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-align: right;
+  transition: color 0.15s;
+}
+
+button.name-link:hover {
+  color: var(--accent-hover);
+}
+
+tr.row-focus {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.card-nested {
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.debtor-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.debtor-detail-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.debtor-detail-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+button.ghost {
+  font-family: inherit;
+  padding: 0.45rem 0.85rem;
+  min-height: 2.25rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+button.ghost:hover {
+  border-color: var(--muted);
+  background: #f1f5f9;
+}
+
+p.small {
+  margin: 0.15rem 0;
+  font-size: 0.82rem;
+}
+
+.balance-bar.debtor-totals {
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ─── بانەرەکان ─── */
+.banner {
+  margin-top: 0.75rem;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+}
+
+.banner.err {
+  background: var(--debt-bg);
+  border-color: var(--debt-border);
+  color: var(--owe);
+  white-space: pre-line;
+}
+
+.banner.ok {
+  background: var(--pay-bg);
+  border: 1px solid var(--pay-border);
+  color: var(--ok);
+}
+
+.form-footnote {
+  margin-top: 0.65rem;
+}
+
+.form-footnote.warn {
+  color: #fecaca;
+}
+
+.banner.soft {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+}
+
+/* ─── فۆرمەکان ─── */
+.grid-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.grid-form .span2 {
+  grid-column: span 2;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+input,
+select {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #94a3b8;
+  background: #ffffff;
+  color: var(--text);
+  width: 100%;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+button.primary {
+  font-family: inherit;
+  padding: 0.65rem 1.35rem;
+  min-height: 2.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  grid-column: span 2;
+  justify-self: start;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: all 0.15s;
+}
+
+button.primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.txn-form > button.primary {
+  margin-top: 0.35rem;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+button.primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ─── کۆمپاکت: تابی مامەڵەی ڕۆژانە ─── */
+.card-compact {
+  padding: 1rem;
+}
+
+.card-compact h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.h2-sm {
+  margin: 0.25rem 0 0.5rem !important;
+  font-size: 0.95rem !important;
+}
+
+.daily-top-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.daily-pick {
+  flex: 1;
+  min-width: 0;
+}
+
+.balance-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 150px;
+  padding: 0.6rem 0.85rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 1.6rem;
+}
+
+.balance-inline .lbl {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-bottom: 0.1rem;
+}
+
+.balance-inline strong {
+  font-size: 1rem;
+}
+
+.balance-inline.empty {
+  justify-content: center;
+  align-items: center;
+  min-height: 60px;
+  border-style: dashed;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.65rem 0 0.5rem;
+}
+
+.search-row.compact {
+  margin-bottom: 0.25rem;
+  gap: 0.65rem;
+}
+
+.txn-grid-compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 0.5rem 0.65rem;
+  align-items: end;
+  margin-bottom: 0.5rem;
+}
+
+.txn-grid-compact label {
+  font-size: 0.8rem;
+}
+
+.txn-grid-compact input,
+.txn-grid-compact select {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.5rem;
+}
+
+button.primary.compact-btn {
+  grid-column: span 1;
+  padding: 0.5rem 1rem;
+  min-height: 2.4rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  align-self: end;
+}
+
+.amount-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 0.5rem;
+}
+
+label.cell-sm {
+  padding: 0.45rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+label.cell-sm input {
+  font-size: 0.88rem;
+  padding: 0.35rem 0.45rem;
+  background: #ffffff;
+  border: 1px solid #94a3b8;
+}
+
+label.cell-sm.debt {
+  background: var(--debt-bg);
+  border: 1px solid var(--debt-border);
+  color: var(--owe);
+}
+
+label.cell-sm.pay {
+  background: var(--pay-bg);
+  border: 1px solid var(--pay-border);
+  color: var(--ok);
+}
+
+label.cell-sm.off {
+  opacity: 0.38;
+  filter: grayscale(0.35);
+}
+
+label.cell-sm.off input:disabled {
+  cursor: not-allowed;
+}
+
+/* ─── سەرچ ─── */
+.search-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-row .grow {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* ─── باڵانس بار ─── */
+.balance-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.balance-bar .hint {
+  grid-column: 1 / -1;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.balance-bar .lbl {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+
+.balance-bar strong {
+  font-size: 1.15rem;
+}
+
+strong.owe {
+  color: var(--owe);
+}
+
+strong.ok {
+  color: var(--ok);
+}
+
+/* ─── مامەڵەی ڕۆژانە ─── */
+.txn-form .txn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.txn-form .span2 {
+  grid-column: span 2;
+}
+
+.txn-form label.cell.debt {
+  background: var(--debt-bg);
+  padding: 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--debt-border);
+  color: var(--owe);
+}
+
+.txn-form label.cell.pay {
+  background: var(--pay-bg);
+  padding: 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--pay-border);
+  color: var(--ok);
+}
+
+.txn-form label.cell input {
+  background: #ffffff;
+  border: 1px solid #94a3b8;
+}
+
+.txn-form label.cell.off {
+  opacity: 0.38;
+  filter: grayscale(0.35);
+}
+
+.txn-form label.cell.off input:disabled {
+  cursor: not-allowed;
+}
+
+/* ─── خشتەکان ─── */
+.table-wrap {
+  overflow: auto;
+}
+
+.table-wrap.scroll {
+  max-height: 420px;
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+table.data thead {
+  position: sticky;
+  top: 0;
+  background: #f1f5f9;
+  z-index: 1;
+}
+
+table.data th,
+table.data td {
+  padding: 0.5rem 0.6rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+table.data th {
+  color: var(--text);
+  font-weight: 600;
+}
+
+table.data.compact th,
+table.data.compact td {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.45rem;
+}
+
+table.data tbody tr {
+  transition: background 0.15s;
+}
+
+table.data tbody tr:hover {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+td.num.debt {
+  color: var(--owe);
+}
+
+td.num.pay {
+  color: var(--ok);
+}
+
+td.num.expense-col {
+  color: var(--expense-text);
+}
+
+button.danger.link {
+  background: none;
+  border: none;
+  color: var(--owe);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  padding: 0.4rem 0.35rem;
+  min-height: 2.25rem;
+  transition: color 0.15s;
+}
+
+button.danger.link:hover {
+  color: #ef4444;
+}
+
+/* ═══════ بەشی مسروفات ═══════ */
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+.filter-row {
+  display: flex;
+  align-items: end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.filter-label input {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.expense-summary-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--expense-bg);
+  border: 1px solid var(--expense-border);
+  border-radius: 10px;
+}
+
+.expense-total .lbl {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+
+.expense-total strong.expense-amount {
+  font-size: 1.15rem;
+  color: var(--expense-text);
+}
+
+/* category badges */
+.cat-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cat-0 { background: #f3f4f6; color: #374151; }
+.cat-1 { background: #dbeafe; color: #1e40af; }
+.cat-2 { background: #f3e8ff; color: #6b21a8; }
+.cat-3 { background: #fee2e2; color: #991b1b; }
+.cat-4 { background: #dcfce7; color: #166534; }
+.cat-5 { background: #fef9c3; color: #854d0e; }
+.cat-6 { background: #e0e7ff; color: #3730a3; }
+
+/* ═══════ بەشی ڕاپۆرت ═══════ */
+
+.report-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.rpt-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  animation: fadeIn 0.35s ease;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.rpt-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+
+.rpt-card .rpt-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.rpt-card strong {
+  font-size: 1.3rem;
+}
+
+.rpt-card .rpt-sub {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* ڕەنگی کارتەکان */
+.rpt-debt {
+  border-right: 3px solid #ef4444;
+}
+.rpt-debt strong { color: var(--owe); }
+
+.rpt-pay {
+  border-right: 3px solid #22c55e;
+}
+.rpt-pay strong { color: var(--ok); }
+
+.rpt-remain {
+  border-right: 3px solid #fbbf24;
+}
+.rpt-remain strong { color: #d97706; }
+
+.rpt-expense {
+  border-right: 3px solid #8b5cf6;
+}
+.rpt-expense strong { color: #6d28d9; }
+
+/* بارچارتی کاتیگۆری */
+.cat-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.cat-bar-row {
+  display: grid;
+  grid-template-columns: 100px 1fr auto auto;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.cat-bar-name {
+  font-size: 0.85rem;
+  color: var(--text);
+  text-align: right;
+}
+
+.cat-bar-track {
+  height: 22px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.cat-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #a78bfa, #818cf8);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+  min-width: 4px;
+}
+
+.cat-bar-val {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text);
+  min-width: 70px;
+  text-align: left;
+}
+
+.cat-bar-val.sub {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* ─── دیزاینی مۆبایل و دێسکتۆپ ─── */
+.desktop-only {
+  display: block;
+}
+.mobile-only {
+  display: none;
+}
+
+/* ─── ڕیسپۆنسیڤ ─── */
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: block !important;
+  }
+
+  .tabs {
+    gap: 0.3rem;
+  }
+  .tabs button {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.85rem;
+  }
+  .report-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cat-bar-row {
+    grid-template-columns: 80px 1fr auto;
+  }
+  .cat-bar-val.sub {
+    display: none;
+  }
+  .grid-form {
+    grid-template-columns: 1fr;
+  }
+  .grid-form .span2 {
+    grid-column: span 1;
+  }
+  button.primary {
+    grid-column: span 1;
+  }
+  .daily-top-row {
+    flex-direction: column;
+  }
+  .balance-inline {
+    margin-top: 0;
+    flex-direction: row;
+    gap: 1.5rem;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .txn-grid-compact {
+    grid-template-columns: 1fr 1fr;
+  }
+  button.primary.compact-btn {
+    grid-column: span 1;
+    width: 100%;
+  }
+  .amount-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .balance-bar {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  /* ─── کارتەکانی قەرزدار لە مۆبایل ─── */
+  .debtor-cards,
+  .txn-cards,
+  .expense-cards,
+  .top-debtor-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .debtor-card-item,
+  .txn-card-item,
+  .expense-card-item,
+  .top-debtor-card-item {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: right;
+  }
+
+  .debtor-card-item.active {
+    border-color: var(--accent);
+    background: rgba(59, 130, 246, 0.04);
+  }
+
+  .debtor-card-header,
+  .txn-card-header,
+  .expense-card-header,
+  .top-debtor-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding-bottom: 0.4rem;
+  }
+
+  .debtor-card-header button.name-link {
+    font-weight: 600;
+    padding: 0;
+    min-height: auto;
+    font-size: 0.95rem;
+  }
+
+  .phone-num {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .debtor-card-balances,
+  .txn-card-amounts,
+  .expense-card-amounts,
+  .top-debtor-card-balances {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .bal-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+  }
+
+  .bal-item .lbl {
+    color: var(--muted);
+  }
+
+  .bal-item .val {
+    font-weight: 600;
+  }
+
+  .debtor-card-note,
+  .expense-card-note {
+    font-size: 0.8rem;
+    background: #ffffff;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+  }
+
+  .debtor-card-actions,
+  .txn-card-actions,
+  .expense-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid rgba(0, 0, 0, 0.03);
+    padding-top: 0.35rem;
+    margin-top: 0.2rem;
+  }
+
+  .debtor-card-actions button,
+  .txn-card-actions button,
+  .expense-card-actions button {
+    padding: 0.25rem 0.5rem;
+    min-height: auto;
+  }
+
+  /* ─── کارتەکانی مامەڵە ─── */
+  .txn-card-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .txn-card-date,
+  .expense-card-header .date {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .txn-card-body,
+  .expense-card-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .txn-card-type {
+    font-size: 0.85rem;
+  }
+
+  .amount-val {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  /* ─── کارتەکانی مسروفات ─── */
+  .expense-card-item .title {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .expense-card-amounts .amt {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--expense-text);
+  }
+
+  /* ─── ڕاپۆرتی سەرەکی قەرزداران ─── */
+  .top-debtor-card-item {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .app {
+    padding: 0.75rem 0.5rem 2rem;
+  }
+  .card {
+    padding: 0.85rem;
+  }
+  .card-compact {
+    padding: 0.75rem;
+  }
+  .tabs {
+    justify-content: space-between;
+  }
+  .tabs button {
+    flex: 1 1 calc(50% - 0.2rem);
+    justify-content: center;
+    padding: 0.45rem 0.35rem;
+    font-size: 0.78rem;
+  }
+  .report-cards {
+    grid-template-columns: 1fr;
+  }
+  .expense-summary-bar {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .amount-row {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+}
