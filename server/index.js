@@ -50,6 +50,36 @@ app.get("/api/admin/backup-db", (req, res) => {
   });
 });
 
+// ─── سفرکردنەوەی تەواوی داتابەیس (Secure SQLite Database Reset) ───
+app.post("/api/admin/reset-db", (req, res) => {
+  const secretKey = req.body?.secret || "";
+  const expectedSecret = process.env.BACKUP_SECRET || "gazxana1234";
+  
+  if (!secretKey || secretKey !== expectedSecret) {
+    return res.status(403).json({ error: "تێپەڕەوشەی باکئەپ هەڵەیە" });
+  }
+  
+  try {
+    db.transaction(() => {
+      // Temporarily disable foreign keys to allow cascading/ordered cleanup
+      db.pragma("foreign_keys = OFF");
+      db.prepare("DELETE FROM tire_sale_items").run();
+      db.prepare("DELETE FROM tire_sales").run();
+      db.prepare("DELETE FROM tire_payments").run();
+      db.prepare("DELETE FROM tire_customers").run();
+      db.prepare("DELETE FROM tires_inventory").run();
+      db.prepare("DELETE FROM transactions").run();
+      db.prepare("DELETE FROM debtors").run();
+      db.prepare("DELETE FROM expenses").run();
+      db.pragma("foreign_keys = ON");
+    })();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Database reset error:", err);
+    res.status(500).json({ error: "سفرکردنەوەی داتابەیس سەرنەکەوت" });
+  }
+});
+
 function rowDebtor(r) {
   const bal = balancesForDebtor(r.id);
   return {

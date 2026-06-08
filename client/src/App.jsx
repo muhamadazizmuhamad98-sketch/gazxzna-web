@@ -340,6 +340,39 @@ export default function App() {
       });
   }
 
+  async function handleResetDatabase() {
+    setBackupErr("");
+    if (!backupSecret.trim()) {
+      setBackupErr("تکایە تێپەڕەوشە بنووسە");
+      return;
+    }
+    if (!confirm("⚠️ ئاگاداری زۆر گرنگ: ئایا دڵنیایت لە سفرکردنەوەی تەواوی داتابەیس؟ هەموو تۆمارەکانی مامەڵە، قەرز، مەسرەف و تایە بە یەکجاری دەسڕێنەوە و ناگەڕێنەوە!")) {
+      return;
+    }
+    try {
+      const r = await fetch(`${API}/admin/reset-db`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: backupSecret })
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        let msg = "کێشەیەک ڕوویدا";
+        try {
+          const j = JSON.parse(raw);
+          msg = j.error || msg;
+        } catch {}
+        setBackupErr(msg);
+        return;
+      }
+      alert("✅ داتابەیس بە سەرکەوتوویی سفر کرایەوە!");
+      setBackupSecret("");
+      window.location.reload();
+    } catch (err) {
+      setBackupErr("پەیوەندی لەگەڵ سێرڤەر سەرنەکەوت.");
+    }
+  }
+
   const refreshDebtors = useCallback(async () => {
     setErr("");
     try {
@@ -1625,13 +1658,13 @@ export default function App() {
             <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
               لێرەوە دەتوانیت کۆپییەکی تەواوی داتابەیسی سیستەمەکە (`gazxana.sqlite`) دابەزێنیتە سەر کۆمپیوتەرەکەت بۆ پاراستنی حیساباتەکانت.
             </p>
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", maxWidth: "450px" }}>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", maxWidth: "550px" }}>
               <input
                 type="password"
-                placeholder="تێپەڕەوشەی باکئەپ بنووسە…"
+                placeholder="تێپەڕەوشە بنووسە…"
                 value={backupSecret}
                 onChange={(e) => setBackupSecret(e.target.value)}
-                style={{ flex: 1, minHeight: "2.2rem" }}
+                style={{ flex: "1 1 200px", minHeight: "2.2rem" }}
               />
               <button
                 type="button"
@@ -1640,6 +1673,14 @@ export default function App() {
                 style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
               >
                 داگرتنی باکئەپ
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={handleResetDatabase}
+                style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
+              >
+                ⚠️ سفرکردنەوەی داتابەیس
               </button>
             </div>
             {backupErr ? <p style={{ color: "var(--owe)", fontSize: "0.85rem", marginTop: "0.5rem" }}>{backupErr}</p> : null}
