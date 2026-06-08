@@ -152,6 +152,7 @@ app.post("/api/transactions", (req, res) => {
   const payment_usd = Number(req.body?.payment_usd) || 0;
   const debt_iqd = Number(req.body?.debt_iqd) || 0;
   const payment_iqd = Number(req.body?.payment_iqd) || 0;
+  const note = String(req.body?.note ?? "").trim();
   if (!debtor_id || Number.isNaN(debtor_id)) {
     return res.status(400).json({ error: "قەرزدار هەڵبژێرە" });
   }
@@ -161,10 +162,10 @@ app.post("/api/transactions", (req, res) => {
   const info = db
     .prepare(
       `INSERT INTO transactions
-      (debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, payment_iqd)
-      VALUES (?,?,?,?,?,?,?,?)`
+      (debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, payment_iqd, note)
+      VALUES (?,?,?,?,?,?,?,?,?)`
     )
-    .run(debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, payment_iqd);
+    .run(debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, payment_iqd, note);
   const row = db
     .prepare(
       `SELECT t.*, d.name AS debtor_name FROM transactions t

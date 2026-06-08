@@ -1,13 +1,13 @@
-const { DatabaseSync } = require("node:sqlite");
+const Database = require("better-sqlite3");
 const path = require("path");
 const fs = require("fs");
 
 const dbPath = path.join(__dirname, "..", "data", "gazxana.sqlite");
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-const db = new DatabaseSync(dbPath);
-db.exec("PRAGMA journal_mode = WAL");
-db.exec("PRAGMA foreign_keys = ON");
+const db = new Database(dbPath);
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS debtors (
@@ -28,6 +28,7 @@ db.exec(`
     payment_usd REAL NOT NULL DEFAULT 0,
     debt_iqd REAL NOT NULL DEFAULT 0,
     payment_iqd REAL NOT NULL DEFAULT 0,
+    note TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -47,5 +48,12 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_exp_date ON expenses(expense_date);
 `);
+
+/* ─── migration: زیادکردنی ستوونی note بۆ خشتەی transactions ─── */
+try {
+  db.exec(`ALTER TABLE transactions ADD COLUMN note TEXT DEFAULT ''`);
+} catch (_) {
+  /* ستوون پێشتر هەیە — هیچ ناکرێت */
+}
 
 module.exports = { db };

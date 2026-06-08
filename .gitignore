@@ -4,3 +4,5 @@ data/*.sqlite-*
 client/dist/
 .DS_Store
 .env
+.vite/
+client/.vite/

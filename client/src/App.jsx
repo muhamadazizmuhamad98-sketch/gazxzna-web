@@ -140,6 +140,7 @@ export default function App() {
     payment_usd: "",
     debt_iqd: "",
     payment_iqd: "",
+    note: "",
   });
 
   /* ─── مسروفات state ─── */
@@ -359,6 +360,7 @@ export default function App() {
       payment_usd: m.payment_usd ? num(txnForm.payment_usd) : 0,
       debt_iqd: m.debt_iqd ? num(txnForm.debt_iqd) : 0,
       payment_iqd: m.payment_iqd ? num(txnForm.payment_iqd) : 0,
+      note: txnForm.note.trim(),
     };
     const r = await fetch(`${API}/transactions`, {
       method: "POST",
@@ -376,6 +378,7 @@ export default function App() {
       payment_usd: "",
       debt_iqd: "",
       payment_iqd: "",
+      note: "",
     }));
     await refreshTxns();
     if (debtorsFocusId && String(debtorsFocusId) === String(selectedId)) {
@@ -586,7 +589,7 @@ export default function App() {
               </div>
             </div>
             <p className="muted hint-inline">بۆ بینینی وردەکاری و لیستی تەواوی مامەڵەکان، لەسەر ناوی قەرزدارەکە کلیک بکە.</p>
-            <div className="table-wrap desktop-only">
+            <div className="table-wrap">
               <table className="data">
                 <thead>
                   <tr>
@@ -630,44 +633,6 @@ export default function App() {
                   ) : null}
                 </tbody>
               </table>
-            </div>
-
-            <div className="mobile-only debtor-cards">
-              {filteredDebtors.map((d) => (
-                <div key={d.id} className={`debtor-card-item ${String(debtorsFocusId) === String(d.id) ? "active" : ""}`}>
-                  <div className="debtor-card-header">
-                    <button
-                      type="button"
-                      className="name-link"
-                      onClick={() => setDebtorsFocusId(String(d.id))}
-                    >
-                      {d.name}
-                    </button>
-                    {d.phone && <span className="phone-num num">{d.phone}</span>}
-                  </div>
-                  <div className="debtor-card-balances">
-                    <div className="bal-item">
-                      <span className="lbl">قەرز ($):</span>
-                      <span className="val num debt">{d.balance_usd ? fmtMoney(d.balance_usd, "usd") : "0 $"}</span>
-                    </div>
-                    <div className="bal-item">
-                      <span className="lbl">قەرز (د.ع):</span>
-                      <span className="val num debt">{d.balance_iqd ? fmtMoney(d.balance_iqd, "iqd") : "0 د.ع"}</span>
-                    </div>
-                  </div>
-                  {d.note && <div className="debtor-card-note muted">{d.note}</div>}
-                  <div className="debtor-card-actions">
-                    <button type="button" className="danger link" onClick={() => removeDebtor(d.id)}>
-                      سڕینەوە
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {filteredDebtors.length === 0 ? (
-                <div className="muted" style={{ textAlign: "center", padding: "2rem" }}>
-                  هیچ قەرزدارێک نەدۆزرایەوە.
-                </div>
-              ) : null}
             </div>
           </section>
 
@@ -871,12 +836,22 @@ export default function App() {
                   />
                 </label>
               </div>
+              <div className="txn-note-row">
+                <label className="txn-note-label">
+                  تێبینی (ئیختیاری — بۆ نموونە: کێ پارەی دایە)
+                  <input
+                    value={txnForm.note}
+                    onChange={(e) => setTxnForm({ ...txnForm, note: e.target.value })}
+                    placeholder="بۆ نموونە: ئەحمەد پارەکەی لە جیاتی دایە"
+                  />
+                </label>
+              </div>
             </form>
           </section>
 
           <section className="card" aria-labelledby="daily-list-heading">
             <h2 id="daily-list-heading">دوایین مامەڵەکان</h2>
-            <div className="table-wrap scroll desktop-only">
+            <div className="table-wrap scroll">
               <table className="data compact">
                 <thead>
                   <tr>
@@ -887,6 +862,7 @@ export default function App() {
                     <th>پارە $</th>
                     <th>قەرز د.ع</th>
                     <th>واسڵ د.ع</th>
+                    <th>تێبینی</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -900,6 +876,7 @@ export default function App() {
                       <td className="num pay">{t.payment_usd ? fmtMoney(t.payment_usd, "usd") : "—"}</td>
                       <td className="num debt">{t.debt_iqd ? fmtMoney(t.debt_iqd, "iqd") : "—"}</td>
                       <td className="num pay">{t.payment_iqd ? fmtMoney(t.payment_iqd, "iqd") : "—"}</td>
+                      <td className="muted txn-note-cell">{t.note || ""}</td>
                       <td>
                         <button type="button" className="danger link" onClick={() => deleteTxn(t.id)}>
                           سڕینەوە
@@ -907,45 +884,8 @@ export default function App() {
                       </td>
                     </tr>
                   ))}
-                  {transactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
-                        هیچ مامەڵەیەک تۆمار نەکراوە.
-                      </td>
-                    </tr>
-                  ) : null}
                 </tbody>
               </table>
-            </div>
-
-            <div className="mobile-only txn-cards">
-              {transactions.map((t) => (
-                <div key={t.id} className="txn-card-item">
-                  <div className="txn-card-header">
-                    <span className="txn-card-name">{t.debtor_name}</span>
-                    <span className="txn-card-date num">{t.txn_date}</span>
-                  </div>
-                  <div className="txn-card-body">
-                    <span className="txn-card-type muted">{t.txn_type}</span>
-                    <div className="txn-card-amounts">
-                      {t.debt_usd ? <div className="amount-val num debt">قەرز: {fmtMoney(t.debt_usd, "usd")}</div> : null}
-                      {t.payment_usd ? <div className="amount-val num pay">واسڵ: {fmtMoney(t.payment_usd, "usd")}</div> : null}
-                      {t.debt_iqd ? <div className="amount-val num debt">قەرز: {fmtMoney(t.debt_iqd, "iqd")}</div> : null}
-                      {t.payment_iqd ? <div className="amount-val num pay">واسڵ: {fmtMoney(t.payment_iqd, "iqd")}</div> : null}
-                    </div>
-                  </div>
-                  <div className="txn-card-actions">
-                    <button type="button" className="danger link" onClick={() => deleteTxn(t.id)}>
-                      سڕینەوە
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {transactions.length === 0 ? (
-                <div className="muted" style={{ textAlign: "center", padding: "2rem" }}>
-                  هیچ مامەڵەیەک تۆمار نەکراوە.
-                </div>
-              ) : null}
             </div>
           </section>
         </div>
@@ -1046,7 +986,7 @@ export default function App() {
                 </label>
               </div>
             </div>
-            <div className="table-wrap scroll desktop-only">
+            <div className="table-wrap scroll">
               <table className="data compact">
                 <thead>
                   <tr>
@@ -1080,35 +1020,6 @@ export default function App() {
                   ) : null}
                 </tbody>
               </table>
-            </div>
-
-            <div className="mobile-only expense-cards">
-              {expenses.map((ex) => (
-                <div key={ex.id} className="expense-card-item">
-                  <div className="expense-card-header">
-                    <span className="title">{ex.title}</span>
-                    <span className="date num">{ex.expense_date}</span>
-                  </div>
-                  <div className="expense-card-body">
-                    <span className={`cat-badge cat-${EXPENSE_CATEGORIES.indexOf(ex.category)}`}>{ex.category}</span>
-                    <div className="expense-card-amounts">
-                      {ex.amount_usd ? <span className="amt usd num">{fmtMoney(ex.amount_usd, "usd")}</span> : null}
-                      {ex.amount_iqd ? <span className="amt iqd num">{fmtMoney(ex.amount_iqd, "iqd")}</span> : null}
-                    </div>
-                  </div>
-                  {ex.note && <div className="expense-card-note muted">{ex.note}</div>}
-                  <div className="expense-card-actions">
-                    <button type="button" className="danger link" onClick={() => deleteExpense(ex.id)}>
-                      سڕینەوە
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {expenses.length === 0 ? (
-                <div className="muted" style={{ textAlign: "center", padding: "2rem" }}>
-                  هیچ مسروفێک تۆمار نەکراوە.
-                </div>
-              ) : null}
             </div>
           </section>
         </div>
@@ -1168,51 +1079,28 @@ export default function App() {
               <section className="card" aria-labelledby="rpt-top-heading">
                 <h2 id="rpt-top-heading">سەرەکیترین قەرزداران</h2>
                 {report.top_debtors.length > 0 ? (
-                  <>
-                    <div className="table-wrap desktop-only">
-                      <table className="data compact">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>ناو</th>
-                            <th>قەرزی ماوە ($)</th>
-                            <th>قەرزی ماوە (د.ع)</th>
+                  <div className="table-wrap">
+                    <table className="data compact">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>ناو</th>
+                          <th>قەرزی ماوە ($)</th>
+                          <th>قەرزی ماوە (د.ع)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.top_debtors.map((d, i) => (
+                          <tr key={i}>
+                            <td className="muted">{i + 1}</td>
+                            <td>{d.name}</td>
+                            <td className="num debt">{fmtMoney(d.balance_usd, "usd")}</td>
+                            <td className="num debt">{fmtMoney(d.balance_iqd, "iqd")}</td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {report.top_debtors.map((d, i) => (
-                            <tr key={i}>
-                              <td className="muted">{i + 1}</td>
-                              <td>{d.name}</td>
-                              <td className="num debt">{fmtMoney(d.balance_usd, "usd")}</td>
-                              <td className="num debt">{fmtMoney(d.balance_iqd, "iqd")}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="mobile-only top-debtor-cards">
-                      {report.top_debtors.map((d, i) => (
-                        <div key={i} className="top-debtor-card-item">
-                          <div className="top-debtor-card-header">
-                            <span className="rank" style={{ fontWeight: "600" }}># {i + 1}</span>
-                            <span className="name">{d.name}</span>
-                          </div>
-                          <div className="top-debtor-card-balances">
-                            <div className="bal-item">
-                              <span className="lbl">قەرزی ماوە ($):</span>
-                              <span className="val num debt">{fmtMoney(d.balance_usd, "usd")}</span>
-                            </div>
-                            <div className="bal-item">
-                              <span className="lbl">قەرزی ماوە (د.ع):</span>
-                              <span className="val num debt">{fmtMoney(d.balance_iqd, "iqd")}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
                   <p className="muted" style={{ textAlign: "center" }}>هیچ قەرزدارێک نییە.</p>
                 )}

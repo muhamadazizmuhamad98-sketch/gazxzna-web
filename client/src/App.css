@@ -467,6 +467,37 @@ label.cell-sm.off input:disabled {
   cursor: not-allowed;
 }
 
+/* ─── تێبینی مامەڵە ─── */
+.txn-note-row {
+  margin-top: 0.45rem;
+}
+
+.txn-note-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.txn-note-label input {
+  font-size: 0.88rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px dashed #94a3b8;
+  background: #fafbfc;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.txn-note-label input:focus {
+  border-style: solid;
+  background: #ffffff;
+}
+
+td.txn-note-cell {
+  font-size: 0.78rem;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ─── سەرچ ─── */
 .search-row {
   display: flex;
@@ -834,23 +865,8 @@ button.danger.link:hover {
   font-size: 0.75rem;
 }
 
-/* ─── دیزاینی مۆبایل و دێسکتۆپ ─── */
-.desktop-only {
-  display: block;
-}
-.mobile-only {
-  display: none;
-}
-
 /* ─── ڕیسپۆنسیڤ ─── */
 @media (max-width: 768px) {
-  .desktop-only {
-    display: none !important;
-  }
-  .mobile-only {
-    display: block !important;
-  }
-
   .tabs {
     gap: 0.3rem;
   }
@@ -883,171 +899,15 @@ button.danger.link:hover {
     margin-top: 0;
     flex-direction: row;
     gap: 1.5rem;
-    width: 100%;
-    justify-content: space-between;
   }
   .txn-grid-compact {
     grid-template-columns: 1fr 1fr;
   }
   button.primary.compact-btn {
-    grid-column: span 1;
-    width: 100%;
+    grid-column: span 2;
   }
   .amount-row {
     grid-template-columns: 1fr 1fr;
-  }
-  .balance-bar {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  /* ─── کارتەکانی قەرزدار لە مۆبایل ─── */
-  .debtor-cards,
-  .txn-cards,
-  .expense-cards,
-  .top-debtor-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    margin-top: 0.5rem;
-  }
-
-  .debtor-card-item,
-  .txn-card-item,
-  .expense-card-item,
-  .top-debtor-card-item {
-    background: #f8fafc;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.85rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    text-align: right;
-  }
-
-  .debtor-card-item.active {
-    border-color: var(--accent);
-    background: rgba(59, 130, 246, 0.04);
-  }
-
-  .debtor-card-header,
-  .txn-card-header,
-  .expense-card-header,
-  .top-debtor-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    padding-bottom: 0.4rem;
-  }
-
-  .debtor-card-header button.name-link {
-    font-weight: 600;
-    padding: 0;
-    min-height: auto;
-    font-size: 0.95rem;
-  }
-
-  .phone-num {
-    font-size: 0.8rem;
-    color: var(--muted);
-  }
-
-  .debtor-card-balances,
-  .txn-card-amounts,
-  .expense-card-amounts,
-  .top-debtor-card-balances {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .bal-item {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.85rem;
-  }
-
-  .bal-item .lbl {
-    color: var(--muted);
-  }
-
-  .bal-item .val {
-    font-weight: 600;
-  }
-
-  .debtor-card-note,
-  .expense-card-note {
-    font-size: 0.8rem;
-    background: #ffffff;
-    padding: 0.35rem 0.5rem;
-    border-radius: 6px;
-    border: 1px dashed var(--border);
-  }
-
-  .debtor-card-actions,
-  .txn-card-actions,
-  .expense-card-actions {
-    display: flex;
-    justify-content: flex-end;
-    border-top: 1px solid rgba(0, 0, 0, 0.03);
-    padding-top: 0.35rem;
-    margin-top: 0.2rem;
-  }
-
-  .debtor-card-actions button,
-  .txn-card-actions button,
-  .expense-card-actions button {
-    padding: 0.25rem 0.5rem;
-    min-height: auto;
-  }
-
-  /* ─── کارتەکانی مامەڵە ─── */
-  .txn-card-name {
-    font-weight: 600;
-    font-size: 0.95rem;
-  }
-
-  .txn-card-date,
-  .expense-card-header .date {
-    font-size: 0.8rem;
-    color: var(--muted);
-  }
-
-  .txn-card-body,
-  .expense-card-body {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
-  .txn-card-type {
-    font-size: 0.85rem;
-  }
-
-  .amount-val {
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-align: left;
-  }
-
-  /* ─── کارتەکانی مسروفات ─── */
-  .expense-card-item .title {
-    font-weight: 600;
-    font-size: 0.95rem;
-  }
-
-  .expense-card-amounts .amt {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--expense-text);
-  }
-
-  /* ─── ڕاپۆرتی سەرەکی قەرزداران ─── */
-  .top-debtor-card-item {
-    flex-direction: column;
   }
 }
 
