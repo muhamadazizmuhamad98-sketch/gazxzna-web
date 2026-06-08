@@ -64,6 +64,7 @@ db.exec(`
     name TEXT NOT NULL UNIQUE COLLATE NOCASE,
     phone TEXT DEFAULT '',
     note TEXT DEFAULT '',
+    initial_balance_usd REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -106,6 +107,13 @@ db.exec(`
 /* ─── migration: زیادکردنی ستوونی note بۆ خشتەی transactions ─── */
 try {
   db.exec(`ALTER TABLE transactions ADD COLUMN note TEXT DEFAULT ''`);
+} catch (_) {
+  /* ستوون پێشتر هەیە — هیچ ناکرێت */
+}
+
+/* ─── migration: زیادکردنی ستوونی initial_balance_usd بۆ خشتەی tire_customers ─── */
+try {
+  db.exec(`ALTER TABLE tire_customers ADD COLUMN initial_balance_usd REAL NOT NULL DEFAULT 0`);
 } catch (_) {
   /* ستوون پێشتر هەیە — هیچ ناکرێت */
 }

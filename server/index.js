@@ -364,7 +364,7 @@ app.get("/api/reports/summary", (req, res) => {
 
 /* ─── تایە فرۆشتن و مخزن (Tires Inventory & Sales) ─── */
 
-function balancesForTireCustomer(customerId) {
+function balancesForTireCustomer(customerId, initialBalanceUsd = 0) {
   const sales = db.prepare(`
     SELECT 
       COALESCE(SUM(total_usd), 0) - COALESCE(SUM(paid_usd), 0) AS owed_usd,
@@ -380,18 +380,19 @@ function balancesForTireCustomer(customerId) {
   `).get(customerId);
   
   return {
-    balance_usd: (sales.owed_usd || 0) - (payments.paid_usd || 0),
+    balance_usd: initialBalanceUsd + (sales.owed_usd || 0) - (payments.paid_usd || 0),
     balance_iqd: (sales.owed_iqd || 0) - (payments.paid_iqd || 0)
   };
 }
 
 function rowTireCustomer(r) {
-  const bal = balancesForTireCustomer(r.id);
+  const bal = balancesForTireCustomer(r.id, r.initial_balance_usd || 0);
   return {
     id: r.id,
     name: r.name,
     phone: r.phone ?? "",
     note: r.note ?? "",
+    initial_balance_usd: r.initial_balance_usd || 0,
     created_at: r.created_at,
     balance_usd: bal.balance_usd,
     balance_iqd: bal.balance_iqd,
@@ -473,11 +474,12 @@ app.post("/api/tire-customers", (req, res) => {
   if (!name) return res.status(400).json({ error: "ناو پێویستە" });
   const phone = String(req.body?.phone ?? "").trim();
   const note = String(req.body?.note ?? "").trim();
+  const initial_balance_usd = Number(req.body?.initial_balance_usd) || 0;
   
   try {
     const info = db
-      .prepare("INSERT INTO tire_customers (name, phone, note) VALUES (?,?,?)")
-      .run(name, phone, note);
+      .prepare("INSERT INTO tire_customers (name, phone, note, initial_balance_usd) VALUES (?,?,?,?)")
+      .run(name, phone, note, initial_balance_usd);
     const r = db.prepare("SELECT * FROM tire_customers WHERE id = ?").get(info.lastInsertRowid);
     res.status(201).json(rowTireCustomer(r));
   } catch (e) {

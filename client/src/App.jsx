@@ -191,7 +191,7 @@ export default function App() {
   const [tireSearch, setTireSearch] = useState("");
   
   const [tireCustomers, setTireCustomers] = useState([]);
-  const [tireCustomerForm, setTireCustomerForm] = useState({ name: "", phone: "", note: "" });
+  const [tireCustomerForm, setTireCustomerForm] = useState({ name: "", phone: "", note: "", initial_balance_usd: "" });
   const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
   const [tireCustomerSearch, setTireCustomerSearch] = useState("");
   
@@ -703,17 +703,23 @@ export default function App() {
     setErr("");
     setInfoMsg("");
     try {
+      const body = {
+        name: tireCustomerForm.name.trim(),
+        phone: tireCustomerForm.phone.trim(),
+        note: tireCustomerForm.note ? tireCustomerForm.note.trim() : "",
+        initial_balance_usd: num(tireCustomerForm.initial_balance_usd),
+      };
       const r = await fetch(`${API}/tire-customers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tireCustomerForm),
+        body: JSON.stringify(body),
       });
       const raw = await r.text();
       if (!r.ok) {
         setErr(humanApiFailure(r.status, raw));
         return;
       }
-      setTireCustomerForm({ name: "", phone: "", note: "" });
+      setTireCustomerForm({ name: "", phone: "", note: "", initial_balance_usd: "" });
       setShowAddCustomerForm(false);
       await loadTireCustomers();
       setInfoMsg("قەرزداری تایە بە سەرکەوتوویی زیادکرا.");
@@ -1999,11 +2005,18 @@ export default function App() {
                               value={tireCustomerForm.name}
                               onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, name: e.target.value })}
                               placeholder="ناوی قەرزدار"
+                              required
                             />
                             <input
                               value={tireCustomerForm.phone}
                               onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, phone: e.target.value })}
                               placeholder="مۆبایل"
+                            />
+                            <input
+                              inputMode="decimal"
+                              value={tireCustomerForm.initial_balance_usd}
+                              onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, initial_balance_usd: e.target.value })}
+                              placeholder="قەرزی سەرەتایی بە دۆلار ($) - ئیختیاری"
                             />
                             <button type="button" className="primary" style={{ width: "100%", minHeight: "2rem" }} onClick={submitTireCustomer}>
                               پاشەکەوتکردن
@@ -2134,8 +2147,67 @@ export default function App() {
                     placeholder="گەڕان بەپێی ناو یان مۆبایل…"
                     style={{ width: "220px" }}
                   />
+                  <button type="button" className="ghost" onClick={() => {
+                    setShowAddCustomerForm(!showAddCustomerForm);
+                    setTireCustomerForm({ name: "", phone: "", note: "", initial_balance_usd: "" });
+                  }}>
+                    {showAddCustomerForm ? "داخستنی فۆرم" : "➕ زیادکردنی قەرزدار"}
+                  </button>
                 </div>
               </div>
+              
+              {showAddCustomerForm ? (
+                <div className="card-nested" style={{ background: "#f8fafc", margin: "1rem", padding: "1rem", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
+                  <h4 style={{ marginTop: 0, marginBottom: "1rem", color: "var(--primary)" }}>➕ زیادکردنی قەرزداری نوێ بۆ بەشی تایە</h4>
+                  <form onSubmit={submitTireCustomer} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem", alignItems: "end" }}>
+                    <label style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", gap: "0.25rem", color: "var(--text)" }}>
+                      ناوی قەرزدار
+                      <input
+                        value={tireCustomerForm.name}
+                        onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, name: e.target.value })}
+                        placeholder="بۆ نموونە: ئەحمەد عەلی"
+                        required
+                      />
+                    </label>
+                    <label style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", gap: "0.25rem", color: "var(--text)" }}>
+                      مۆبایل
+                      <input
+                        value={tireCustomerForm.phone}
+                        onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, phone: e.target.value })}
+                        placeholder="ئیختیاری"
+                      />
+                    </label>
+                    <label style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", gap: "0.25rem", color: "var(--text)" }}>
+                      قەرزی سەرەتایی بە دۆلار ($)
+                      <input
+                        inputMode="decimal"
+                        value={tireCustomerForm.initial_balance_usd}
+                        onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, initial_balance_usd: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </label>
+                    <label style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", gap: "0.25rem", color: "var(--text)" }}>
+                      تێبینی
+                      <input
+                        value={tireCustomerForm.note}
+                        onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, note: e.target.value })}
+                        placeholder="ئیختیاری"
+                      />
+                    </label>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button type="submit" className="primary" style={{ minHeight: "2.2rem", flex: 1 }}>
+                        پاشەکەوتکردن
+                      </button>
+                      <button type="button" className="ghost" style={{ minHeight: "2.2rem" }} onClick={() => {
+                        setShowAddCustomerForm(false);
+                        setTireCustomerForm({ name: "", phone: "", note: "", initial_balance_usd: "" });
+                      }}>
+                        پاشگەزبوونەوە
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : null}
               <div className="table-wrap">
                 <table className="data">
                   <thead>
