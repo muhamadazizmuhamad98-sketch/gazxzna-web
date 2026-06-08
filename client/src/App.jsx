@@ -197,13 +197,12 @@ export default function App() {
   
   const [tireSales, setTireSales] = useState([]);
   const [cart, setCart] = useState([]);
-  const [cartForm, setCartForm] = useState({ tire_id: "", quantity: "1", price_usd: "", price_iqd: "" });
+  const [cartForm, setCartForm] = useState({ tire_id: "", quantity: "1", price_usd: "" });
   const [saleForm, setSaleForm] = useState({
     sale_date: today,
     customer_id: "",
     payment_type: "نەقد",
     paid_usd: "",
-    paid_iqd: "",
     note: ""
   });
   
@@ -212,7 +211,6 @@ export default function App() {
     customer_id: "",
     payment_date: today,
     amount_usd: "",
-    amount_iqd: "",
     note: ""
   });
   const [activeTireCustomerTab, setActiveTireCustomerTab] = useState("customers"); // customers, payments
@@ -672,7 +670,6 @@ export default function App() {
     const tireId = Number(cartForm.tire_id);
     const qty = Number(cartForm.quantity) || 0;
     const prcUsd = Number(cartForm.price_usd) || 0;
-    const prcIqd = Number(cartForm.price_iqd) || 0;
 
     if (!tireId) {
       setErr("تایەیەک هەڵبژێرە");
@@ -702,12 +699,11 @@ export default function App() {
         tire_id: tireId,
         tire_name: selectedTire.name,
         quantity: qty,
-        price_usd: prcUsd,
-        price_iqd: prcIqd
+        price_usd: prcUsd
       }]);
     }
 
-    setCartForm({ tire_id: "", quantity: "1", price_usd: "", price_iqd: "" });
+    setCartForm({ tire_id: "", quantity: "1", price_usd: "" });
   }
 
   function removeFromCart(index) {
@@ -734,10 +730,8 @@ export default function App() {
 
     // Calculate totals
     let totUsd = 0;
-    let totIqd = 0;
     cart.forEach((item) => {
       totUsd += (item.price_usd || 0) * item.quantity;
-      totIqd += (item.price_iqd || 0) * item.quantity;
     });
 
     const body = {
@@ -745,15 +739,15 @@ export default function App() {
       sale_date: saleForm.sale_date,
       payment_type: saleForm.payment_type,
       total_usd: totUsd,
-      total_iqd: totIqd,
+      total_iqd: 0,
       paid_usd: isCredit ? (Number(saleForm.paid_usd) || 0) : totUsd,
-      paid_iqd: isCredit ? (Number(saleForm.paid_iqd) || 0) : totIqd,
+      paid_iqd: 0,
       note: saleForm.note.trim(),
       items: cart.map(i => ({
         tire_id: i.tire_id,
         quantity: i.quantity,
         price_usd: i.price_usd,
-        price_iqd: i.price_iqd
+        price_iqd: 0
       }))
     };
 
@@ -774,7 +768,6 @@ export default function App() {
         customer_id: "",
         payment_type: "نەقد",
         paid_usd: "",
-        paid_iqd: "",
         note: ""
       });
       await loadTires();
@@ -808,7 +801,7 @@ export default function App() {
       customer_id: Number(tirePaymentForm.customer_id),
       payment_date: tirePaymentForm.payment_date,
       amount_usd: num(tirePaymentForm.amount_usd),
-      amount_iqd: num(tirePaymentForm.amount_iqd),
+      amount_iqd: 0,
       note: tirePaymentForm.note.trim()
     };
 
@@ -832,7 +825,6 @@ export default function App() {
         customer_id: "",
         payment_date: today,
         amount_usd: "",
-        amount_iqd: "",
         note: ""
       });
       await loadTirePayments();
@@ -914,21 +906,19 @@ export default function App() {
   }, [tireCustomers, tireCustomerSearch]);
 
   const tireCustomersTotals = useMemo(() => {
-    let usd = 0, iqd = 0;
+    let usd = 0;
     tireCustomers.forEach((c) => {
       usd += c.balance_usd || 0;
-      iqd += c.balance_iqd || 0;
     });
-    return { usd, iqd };
+    return { usd };
   }, [tireCustomers]);
 
   const cartTotals = useMemo(() => {
-    let usd = 0, iqd = 0;
+    let usd = 0;
     cart.forEach((i) => {
       usd += (i.price_usd || 0) * i.quantity;
-      iqd += (i.price_iqd || 0) * i.quantity;
     });
-    return { usd, iqd };
+    return { usd };
   }, [cart]);
 
   function patchTxnForm(updates) {
@@ -1801,15 +1791,6 @@ export default function App() {
                       required
                     />
                   </label>
-                  <label>
-                    نرخی فرۆشتن بە دینار (ئیختیاری)
-                    <input
-                      inputMode="numeric"
-                      value={cartForm.price_iqd}
-                      onChange={(e) => setCartForm({ ...cartForm, price_iqd: e.target.value })}
-                      placeholder="0"
-                    />
-                  </label>
                   <button type="submit" className="primary span2" style={{ justifySelf: "stretch" }}>
                     زیادکردن بۆ سەبەتە
                   </button>
@@ -1826,7 +1807,6 @@ export default function App() {
                         <th>بابەت</th>
                         <th>بڕ</th>
                         <th>نرخ ($)</th>
-                        <th>نرخ (IQD)</th>
                         <th>کۆ ($)</th>
                         <th>کردار</th>
                       </tr>
@@ -1837,7 +1817,6 @@ export default function App() {
                           <td>{item.tire_name}</td>
                           <td>{item.quantity} دانە</td>
                           <td className="num">{fmtMoney(item.price_usd, "usd")}</td>
-                          <td className="num">{item.price_iqd ? fmtMoney(item.price_iqd, "iqd") : "—"}</td>
                           <td className="num" style={{ fontWeight: "600" }}>{fmtMoney(item.price_usd * item.quantity, "usd")}</td>
                           <td>
                             <button type="button" className="danger link" onClick={() => removeFromCart(index)}>
@@ -1848,7 +1827,7 @@ export default function App() {
                       ))}
                       {cart.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="muted" style={{ textAlign: "center", padding: "1.5rem" }}>
+                          <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "1.5rem" }}>
                             هیچ بابەتێک لە سەبەتەدا نییە.
                           </td>
                         </tr>
@@ -1862,10 +1841,6 @@ export default function App() {
                     <div>
                       <span className="lbl">کۆی گشتی بە دۆلار ($)</span>
                       <strong>{fmtMoney(cartTotals.usd, "usd")}</strong>
-                    </div>
-                    <div>
-                      <span className="lbl">کۆی گشتی بە دینار (IQD)</span>
-                      <strong>{fmtMoney(cartTotals.iqd, "iqd")}</strong>
                     </div>
                   </div>
                 ) : null}
@@ -1942,22 +1917,13 @@ export default function App() {
                         </div>
                       ) : null}
 
-                      <label>
+                      <label className="span2">
                         پارەی دراو بە دۆلار ($)
                         <input
                           inputMode="decimal"
                           value={saleForm.paid_usd}
                           onChange={(e) => setSaleForm({ ...saleForm, paid_usd: e.target.value })}
                           placeholder="0.00"
-                        />
-                      </label>
-                      <label>
-                        پارەی دراو بە دینار (IQD)
-                        <input
-                          inputMode="numeric"
-                          value={saleForm.paid_iqd}
-                          onChange={(e) => setSaleForm({ ...saleForm, paid_iqd: e.target.value })}
-                          placeholder="0"
                         />
                       </label>
                     </>
@@ -2013,7 +1979,6 @@ export default function App() {
                       </td>
                       <td className="num">
                         <div>{fmtMoney(s.total_usd, "usd")}</div>
-                        {s.total_iqd ? <div className="muted small">{fmtMoney(s.total_iqd, "iqd")}</div> : null}
                       </td>
                       <td className="num">
                         {s.payment_type === "قەرز" ? (
@@ -2054,14 +2019,10 @@ export default function App() {
         <div className="tab-panels">
           {/* کورتەی کۆی قەرزی تایەکان */}
           <section className="card">
-            <div className="expense-summary-bar" style={{ background: "var(--debt-bg)", borderColor: "var(--debt-border)" }}>
+            <div className="expense-summary-bar" style={{ background: "var(--debt-bg)", borderColor: "var(--debt-border)", gridTemplateColumns: "1fr" }}>
               <div className="expense-total">
                 <span className="lbl" style={{ color: "var(--text)" }}>کۆ قەرزی تایە بە دۆلار ($)</span>
                 <strong className="expense-amount" style={{ color: "var(--owe)" }}>{fmtMoney(tireCustomersTotals.usd, "usd")}</strong>
-              </div>
-              <div className="expense-total">
-                <span className="lbl" style={{ color: "var(--text)" }}>کۆ قەرزی تایە بە دینار (IQD)</span>
-                <strong className="expense-amount" style={{ color: "var(--owe)" }}>{fmtMoney(tireCustomersTotals.iqd, "iqd")}</strong>
               </div>
             </div>
           </section>
@@ -2087,7 +2048,6 @@ export default function App() {
                       <th>ناو</th>
                       <th>مۆبایل</th>
                       <th>ماوەی قەرز ($)</th>
-                      <th>ماوەی قەرز (IQD)</th>
                       <th>تێبینی</th>
                     </tr>
                   </thead>
@@ -2101,13 +2061,12 @@ export default function App() {
                         </td>
                         <td>{c.phone}</td>
                         <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(c.balance_usd, "usd")}</td>
-                        <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(c.balance_iqd, "iqd")}</td>
                         <td className="muted">{c.note}</td>
                       </tr>
                     ))}
                     {filteredTireCustomers.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
+                        <td colSpan={4} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
                           هیچ قەرزدارێکی تایە نەدۆزرایەوە.
                         </td>
                       </tr>
@@ -2133,10 +2092,6 @@ export default function App() {
                       <span className="lbl">ماوەی قەرز بە دۆلار</span>
                       <strong style={{ color: "var(--owe)" }}>{fmtMoney(focusedTireCustomerDetail.balance_usd, "usd")}</strong>
                     </div>
-                    <div>
-                      <span className="lbl">ماوەی قەرز بە دینار</span>
-                      <strong style={{ color: "var(--owe)" }}>{fmtMoney(focusedTireCustomerDetail.balance_iqd, "iqd")}</strong>
-                    </div>
                   </div>
 
                   <form className="grid-form" onSubmit={submitTirePayment}>
@@ -2149,22 +2104,13 @@ export default function App() {
                         required
                       />
                     </label>
-                    <label>
+                    <label className="span2">
                       بڕی وەرگیراو بە دۆلار ($)
                       <input
                         inputMode="decimal"
                         value={tirePaymentForm.amount_usd}
                         onChange={(e) => setTirePaymentForm({ ...tirePaymentForm, amount_usd: e.target.value, customer_id: focusedTireCustomerId })}
                         placeholder="0.00"
-                      />
-                    </label>
-                    <label>
-                      بڕی وەرگیراو بە دینار (IQD)
-                      <input
-                        inputMode="numeric"
-                        value={tirePaymentForm.amount_iqd}
-                        onChange={(e) => setTirePaymentForm({ ...tirePaymentForm, amount_iqd: e.target.value, customer_id: focusedTireCustomerId })}
-                        placeholder="0"
                       />
                     </label>
                     <label className="span2">
@@ -2201,9 +2147,7 @@ export default function App() {
                             <tr key={p.id}>
                               <td>{p.payment_date}</td>
                               <td className="num" style={{ color: "var(--ok)", fontWeight: "600" }}>
-                                {p.amount_usd ? fmtMoney(p.amount_usd, "usd") : ""}
-                                {p.amount_usd && p.amount_iqd ? " + " : ""}
-                                {p.amount_iqd ? fmtMoney(p.amount_iqd, "iqd") : ""}
+                                {p.amount_usd ? fmtMoney(p.amount_usd, "usd") : "0 $"}
                               </td>
                               <td className="muted">{p.note}</td>
                               <td>
@@ -2263,17 +2207,14 @@ export default function App() {
                 <div className="rpt-card rpt-pay">
                   <span className="rpt-label">کۆی فرۆشی تایەکان</span>
                   <strong>{fmtMoney(tireReport.total_sales_usd, "usd")}</strong>
-                  <span className="rpt-sub">{fmtMoney(tireReport.total_sales_iqd, "iqd")}</span>
                 </div>
                 <div className="rpt-card rpt-remain">
                   <span className="rpt-label">پارەی نەختینە (دراو)</span>
                   <strong>{fmtMoney(tireReport.total_cash_usd, "usd")}</strong>
-                  <span className="rpt-sub">{fmtMoney(tireReport.total_cash_iqd, "iqd")}</span>
                 </div>
                 <div className="rpt-card rpt-debt">
                   <span className="rpt-label">ماوەی قەرز (لای کڕیاران)</span>
                   <strong>{fmtMoney(tireReport.outstanding_debt_usd, "usd")}</strong>
-                  <span className="rpt-sub">{fmtMoney(tireReport.outstanding_debt_iqd, "iqd")}</span>
                 </div>
                 <div className="rpt-card rpt-expense">
                   <span className="rpt-label">کۆی بەهای مخزن بە نرخی کڕین</span>
