@@ -221,6 +221,9 @@ export default function App() {
   const [tireReportFrom, setTireReportFrom] = useState("");
   const [tireReportTo, setTireReportTo] = useState("");
   const [tireReportLoading, setTireReportLoading] = useState(false);
+  
+  const [backupSecret, setBackupSecret] = useState("");
+  const [backupErr, setBackupErr] = useState("");
 
   /* ───────── API helpers ───────── */
 
@@ -311,6 +314,31 @@ export default function App() {
       setReportLoading(false);
     }
   }, [reportFrom, reportTo]);
+
+  function handleDownloadBackup() {
+    setBackupErr("");
+    if (!backupSecret.trim()) {
+      setBackupErr("تکایە تێپەڕەوشە بنووسە");
+      return;
+    }
+    const downloadUrl = `${API}/admin/backup-db?secret=${encodeURIComponent(backupSecret)}`;
+    fetch(downloadUrl, { method: "HEAD" })
+      .then((res) => {
+        if (!res.ok) {
+          if (res.status === 403) {
+            setBackupErr("تێپەڕەوشەی باکئەپ هەڵەیە!");
+          } else {
+            setBackupErr("کێشەیەک ڕوویدا لە کاتی داگرتن.");
+          }
+        } else {
+          window.location.href = downloadUrl;
+          setBackupSecret("");
+        }
+      })
+      .catch(() => {
+        setBackupErr("پەیوەندی لەگەڵ سێرڤەر سەرنەکەوت.");
+      });
+  }
 
   const refreshDebtors = useCallback(async () => {
     setErr("");
@@ -1590,6 +1618,32 @@ export default function App() {
               </section>
             </>
           ) : null}
+
+          {/* بەشی باکئەپی داتابەیس */}
+          <section className="card card-compact" style={{ marginTop: "1.5rem" }}>
+            <h3>باکئەپ و پاراستنی داتاکان (SQLite Backup)</h3>
+            <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
+              لێرەوە دەتوانیت کۆپییەکی تەواوی داتابەیسی سیستەمەکە (`gazxana.sqlite`) دابەزێنیتە سەر کۆمپیوتەرەکەت بۆ پاراستنی حیساباتەکانت.
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", maxWidth: "450px" }}>
+              <input
+                type="password"
+                placeholder="تێپەڕەوشەی باکئەپ بنووسە…"
+                value={backupSecret}
+                onChange={(e) => setBackupSecret(e.target.value)}
+                style={{ flex: 1, minHeight: "2.2rem" }}
+              />
+              <button
+                type="button"
+                className="primary"
+                onClick={handleDownloadBackup}
+                style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
+              >
+                داگرتنی باکئەپ
+              </button>
+            </div>
+            {backupErr ? <p style={{ color: "var(--owe)", fontSize: "0.85rem", marginTop: "0.5rem" }}>{backupErr}</p> : null}
+          </section>
         </div>
       ) : null}
 

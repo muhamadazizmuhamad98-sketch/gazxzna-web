@@ -29,6 +29,27 @@ const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
+// ─── باکئەپی داتابەیس (Secure SQLite Backup) ───
+app.get("/api/admin/backup-db", (req, res) => {
+  const secretKey = req.query.secret || "";
+  const expectedSecret = process.env.BACKUP_SECRET || "gazxana1234";
+  
+  if (!secretKey || secretKey !== expectedSecret) {
+    return res.status(403).json({ error: "تێپەڕەوشەی باکئەپ هەڵەیە" });
+  }
+  
+  const dbPath = path.join(__dirname, "..", "data", "gazxana.sqlite");
+  if (!fs.existsSync(dbPath)) {
+    return res.status(404).json({ error: "داتابەیس نەدۆزرایەوە" });
+  }
+  
+  res.download(dbPath, "gazxana_backup.sqlite", (err) => {
+    if (err && !res.headersSent) {
+      console.error("Backup download error:", err);
+    }
+  });
+});
+
 function rowDebtor(r) {
   const bal = balancesForDebtor(r.id);
   return {
