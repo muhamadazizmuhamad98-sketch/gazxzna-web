@@ -2376,7 +2376,7 @@ export default function App() {
                   <strong>{fmtMoney(tireReport.total_sales_usd, "usd")}</strong>
                 </div>
                 <div className="rpt-card rpt-remain">
-                  <span className="rpt-label">پارەی نەختینە (دراو)</span>
+                  <span className="rpt-label">پارەی وەرگیراو</span>
                   <strong>{fmtMoney(tireReport.total_cash_usd, "usd")}</strong>
                 </div>
                 <div className="rpt-card rpt-debt">
@@ -2384,9 +2384,13 @@ export default function App() {
                   <strong>{fmtMoney(tireReport.outstanding_debt_usd, "usd")}</strong>
                 </div>
                 <div className="rpt-card rpt-expense">
-                  <span className="rpt-label">کۆی بەهای مخزن بە نرخی کڕین</span>
+                  <span className="rpt-label">کۆی گشتی کڕین</span>
                   <strong>{fmtMoney(tireReport.stock_value_purchase_usd, "usd")}</strong>
                   <span className="rpt-sub">بەهای فرۆشتن: {fmtMoney(tireReport.stock_value_sale_usd, "usd")}</span>
+                </div>
+                <div className="rpt-card rpt-profit">
+                  <span className="rpt-label">کۆی گشتی قازانج</span>
+                  <strong>{fmtMoney(tireReport.total_profit_usd, "usd")}</strong>
                 </div>
               </div>
 

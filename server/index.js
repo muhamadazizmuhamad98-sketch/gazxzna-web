@@ -683,6 +683,19 @@ app.get("/api/tire-reports/summary", (req, res) => {
     FROM tires_inventory
   `).get();
   
+  let profitSql = `
+    SELECT 
+      COALESCE(SUM(i.quantity * (i.price_usd - t.purchase_price_usd)), 0) AS total_profit_usd
+    FROM tire_sale_items i
+    JOIN tires_inventory t ON t.id = i.tire_id
+    JOIN tire_sales s ON s.id = i.sale_id
+    WHERE 1=1
+  `;
+  const profitParams = [];
+  if (from) { profitSql += " AND s.sale_date >= ?"; profitParams.push(from); }
+  if (to) { profitSql += " AND s.sale_date <= ?"; profitParams.push(to); }
+  const profit = db.prepare(profitSql).get(...profitParams);
+  
   const totalOwedSales = db.prepare("SELECT SUM(total_usd - paid_usd) AS owed_usd, SUM(total_iqd - paid_iqd) AS owed_iqd FROM tire_sales").get();
   const totalPayments = db.prepare("SELECT SUM(amount_usd) AS paid_usd, SUM(amount_iqd) AS paid_iqd FROM tire_payments").get();
   
@@ -699,7 +712,8 @@ app.get("/api/tire-reports/summary", (req, res) => {
     stock_value_purchase_usd: stock.stock_value_purchase_usd || 0,
     stock_value_sale_usd: stock.stock_value_sale_usd || 0,
     total_tires_count: stock.total_tires_count || 0,
-    popular_tires: popularTires
+    popular_tires: popularTires,
+    total_profit_usd: profit.total_profit_usd || 0
   });
 });
 

@@ -823,6 +823,11 @@ button.danger.link:hover {
 }
 .rpt-expense strong { color: #6d28d9; }
 
+.rpt-profit {
+  border-right: 3px solid #06b6d4;
+}
+.rpt-profit strong { color: #0891b2; }
+
 /* بارچارتی کاتیگۆری */
 .cat-bars {
   display: flex;
