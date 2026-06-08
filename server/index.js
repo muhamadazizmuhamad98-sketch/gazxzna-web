@@ -311,6 +311,346 @@ app.get("/api/reports/summary", (req, res) => {
   });
 });
 
+/* ─── تایە فرۆشتن و مخزن (Tires Inventory & Sales) ─── */
+
+function balancesForTireCustomer(customerId) {
+  const sales = db.prepare(`
+    SELECT 
+      COALESCE(SUM(total_usd), 0) - COALESCE(SUM(paid_usd), 0) AS owed_usd,
+      COALESCE(SUM(total_iqd), 0) - COALESCE(SUM(paid_iqd), 0) AS owed_iqd
+    FROM tire_sales WHERE customer_id = ?
+  `).get(customerId);
+  
+  const payments = db.prepare(`
+    SELECT 
+      COALESCE(SUM(amount_usd), 0) AS paid_usd,
+      COALESCE(SUM(amount_iqd), 0) AS paid_iqd
+    FROM tire_payments WHERE customer_id = ?
+  `).get(customerId);
+  
+  return {
+    balance_usd: (sales.owed_usd || 0) - (payments.paid_usd || 0),
+    balance_iqd: (sales.owed_iqd || 0) - (payments.paid_iqd || 0)
+  };
+}
+
+function rowTireCustomer(r) {
+  const bal = balancesForTireCustomer(r.id);
+  return {
+    id: r.id,
+    name: r.name,
+    phone: r.phone ?? "",
+    note: r.note ?? "",
+    created_at: r.created_at,
+    balance_usd: bal.balance_usd,
+    balance_iqd: bal.balance_iqd,
+  };
+}
+
+// 1. Inventory Endpoints
+app.get("/api/tires", (_req, res) => {
+  const rows = db.prepare("SELECT * FROM tires_inventory ORDER BY name COLLATE NOCASE").all();
+  res.json(rows);
+});
+
+app.post("/api/tires", (req, res) => {
+  const name = String(req.body?.name ?? "").trim();
+  if (!name) return res.status(400).json({ error: "ناوی تایە پێویستە" });
+  const size = String(req.body?.size ?? "").trim();
+  const quantity = Number(req.body?.quantity) || 0;
+  const purchase_price_usd = Number(req.body?.purchase_price_usd) || 0;
+  const sale_price_usd = Number(req.body?.sale_price_usd) || 0;
+  
+  try {
+    const info = db
+      .prepare("INSERT INTO tires_inventory (name, size, quantity, purchase_price_usd, sale_price_usd) VALUES (?,?,?,?,?)")
+      .run(name, size, quantity, purchase_price_usd, sale_price_usd);
+    const r = db.prepare("SELECT * FROM tires_inventory WHERE id = ?").get(info.lastInsertRowid);
+    res.status(201).json(r);
+  } catch (e) {
+    if (String(e.message).includes("UNIQUE")) {
+      return res.status(409).json({ error: "ئەم تایەیە پێشتر هەیە لە مخزن" });
+    }
+    throw e;
+  }
+});
+
+app.patch("/api/tires/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM tires_inventory WHERE id = ?").get(id);
+  if (!cur) return res.status(404).json({ error: "نەدۆزرایەوە" });
+  
+  const name = req.body?.name != null ? String(req.body.name).trim() : cur.name;
+  const size = req.body?.size != null ? String(req.body.size).trim() : cur.size;
+  const quantity = req.body?.quantity != null ? Number(req.body.quantity) : cur.quantity;
+  const purchase_price_usd = req.body?.purchase_price_usd != null ? Number(req.body.purchase_price_usd) : cur.purchase_price_usd;
+  const sale_price_usd = req.body?.sale_price_usd != null ? Number(req.body.sale_price_usd) : cur.sale_price_usd;
+  
+  if (!name) return res.status(400).json({ error: "ناونیشانی تایە پێویستە" });
+  
+  try {
+    db.prepare(`
+      UPDATE tires_inventory 
+      SET name = ?, size = ?, quantity = ?, purchase_price_usd = ?, sale_price_usd = ?
+      WHERE id = ?
+    `).run(name, size, quantity, purchase_price_usd, sale_price_usd, id);
+    const r = db.prepare("SELECT * FROM tires_inventory WHERE id = ?").get(id);
+    res.json(r);
+  } catch (e) {
+    if (String(e.message).includes("UNIQUE")) {
+      return res.status(409).json({ error: "ئەم ناوە پێشتر هەیە" });
+    }
+    throw e;
+  }
+});
+
+app.delete("/api/tires/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const info = db.prepare("DELETE FROM tires_inventory WHERE id = ?").run(id);
+  if (info.changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
+  res.json({ ok: true });
+});
+
+// 2. Customers Endpoints
+app.get("/api/tire-customers", (_req, res) => {
+  const rows = db.prepare("SELECT * FROM tire_customers ORDER BY name COLLATE NOCASE").all();
+  res.json(rows.map(rowTireCustomer));
+});
+
+app.post("/api/tire-customers", (req, res) => {
+  const name = String(req.body?.name ?? "").trim();
+  if (!name) return res.status(400).json({ error: "ناو پێویستە" });
+  const phone = String(req.body?.phone ?? "").trim();
+  const note = String(req.body?.note ?? "").trim();
+  
+  try {
+    const info = db
+      .prepare("INSERT INTO tire_customers (name, phone, note) VALUES (?,?,?)")
+      .run(name, phone, note);
+    const r = db.prepare("SELECT * FROM tire_customers WHERE id = ?").get(info.lastInsertRowid);
+    res.status(201).json(rowTireCustomer(r));
+  } catch (e) {
+    if (String(e.message).includes("UNIQUE")) {
+      return res.status(409).json({ error: "ئەم ناوە پێشتر هەیە" });
+    }
+    throw e;
+  }
+});
+
+// 3. Sales Endpoints
+app.get("/api/tire-sales", (_req, res) => {
+  const rows = db.prepare(`
+    SELECT s.*, c.name AS customer_name 
+    FROM tire_sales s
+    LEFT JOIN tire_customers c ON c.id = s.customer_id
+    ORDER BY s.sale_date DESC, s.id DESC LIMIT 500
+  `).all();
+  
+  const salesWithItems = rows.map(sale => {
+    const items = db.prepare(`
+      SELECT i.*, t.name AS tire_name
+      FROM tire_sale_items i
+      JOIN tires_inventory t ON t.id = i.tire_id
+      WHERE i.sale_id = ?
+    `).all(sale.id);
+    return { ...sale, items };
+  });
+  
+  res.json(salesWithItems);
+});
+
+app.post("/api/tire-sales", (req, res) => {
+  const customer_id = req.body?.customer_id ? Number(req.body.customer_id) : null;
+  const sale_date = String(req.body?.sale_date ?? "").trim();
+  const payment_type = String(req.body?.payment_type ?? "نەقد").trim();
+  const total_usd = Number(req.body?.total_usd) || 0;
+  const total_iqd = Number(req.body?.total_iqd) || 0;
+  const paid_usd = Number(req.body?.paid_usd) || 0;
+  const paid_iqd = Number(req.body?.paid_iqd) || 0;
+  const note = String(req.body?.note ?? "").trim();
+  const items = req.body?.items || []; // { tire_id, quantity, price_usd, price_iqd }
+  
+  if (!sale_date) return res.status(400).json({ error: "ڕێکەوت پێویستە" });
+  if (items.length === 0) return res.status(400).json({ error: "لانیکەم پێویستە یەک جۆر تایە هەڵبژێریت" });
+  
+  const executeSale = db.transaction(() => {
+    const info = db.prepare(`
+      INSERT INTO tire_sales (customer_id, sale_date, payment_type, total_usd, total_iqd, paid_usd, paid_iqd, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(customer_id, sale_date, payment_type, total_usd, total_iqd, paid_usd, paid_iqd, note);
+    
+    const saleId = info.lastInsertRowid;
+    
+    for (const item of items) {
+      const tireId = Number(item.tire_id);
+      const quantity = Number(item.quantity) || 0;
+      const priceUsd = Number(item.price_usd) || 0;
+      const priceIqd = Number(item.price_iqd) || 0;
+      
+      if (!tireId || quantity <= 0) {
+        throw new Error("زانیاری تایە یان بڕی فرۆشراو نادروستە");
+      }
+      
+      const tire = db.prepare("SELECT quantity, name FROM tires_inventory WHERE id = ?").get(tireId);
+      if (!tire || tire.quantity < quantity) {
+        throw new Error(`بڕی پێویست لە مخزن نییە بۆ تایەی: ${tire ? tire.name : 'نەناسراو'}`);
+      }
+      
+      db.prepare(`
+        INSERT INTO tire_sale_items (sale_id, tire_id, quantity, price_usd, price_iqd)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(saleId, tireId, quantity, priceUsd, priceIqd);
+      
+      db.prepare("UPDATE tires_inventory SET quantity = quantity - ? WHERE id = ?").run(quantity, tireId);
+    }
+    return saleId;
+  });
+  
+  try {
+    const saleId = executeSale();
+    res.status(201).json({ ok: true, sale_id: saleId });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.delete("/api/tire-sales/:id", (req, res) => {
+  const saleId = Number(req.params.id);
+  
+  const voidSale = db.transaction(() => {
+    const items = db.prepare("SELECT * FROM tire_sale_items WHERE sale_id = ?").all(saleId);
+    for (const item of items) {
+      db.prepare("UPDATE tires_inventory SET quantity = quantity + ? WHERE id = ?").run(item.quantity, item.tire_id);
+    }
+    const info = db.prepare("DELETE FROM tire_sales WHERE id = ?").run(saleId);
+    return info.changes;
+  });
+  
+  try {
+    const changes = voidSale();
+    if (changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// 4. Payments Endpoints
+app.get("/api/tire-payments", (req, res) => {
+  const customerId = req.query.customer_id ? Number(req.query.customer_id) : null;
+  let sql = `
+    SELECT p.*, c.name AS customer_name
+    FROM tire_payments p
+    JOIN tire_customers c ON c.id = p.customer_id
+    WHERE 1=1
+  `;
+  const params = [];
+  if (customerId) {
+    sql += " AND p.customer_id = ?";
+    params.push(customerId);
+  }
+  sql += " ORDER BY p.payment_date DESC, p.id DESC LIMIT 500";
+  const rows = db.prepare(sql).all(...params);
+  res.json(rows);
+});
+
+app.post("/api/tire-payments", (req, res) => {
+  const customer_id = Number(req.body?.customer_id);
+  const payment_date = String(req.body?.payment_date ?? "").trim();
+  const amount_usd = Number(req.body?.amount_usd) || 0;
+  const amount_iqd = Number(req.body?.amount_iqd) || 0;
+  const note = String(req.body?.note ?? "").trim();
+  
+  if (!customer_id) return res.status(400).json({ error: "قەرزدار هەڵبژێرە" });
+  if (!payment_date) return res.status(400).json({ error: "ڕێکەوت پێویستە" });
+  if (amount_usd === 0 && amount_iqd === 0) return res.status(400).json({ error: "بڕی پارەی واسڵکراو بنووسە" });
+  
+  const info = db.prepare(`
+    INSERT INTO tire_payments (customer_id, payment_date, amount_usd, amount_iqd, note)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(customer_id, payment_date, amount_usd, amount_iqd, note);
+  
+  res.status(201).json({ id: info.lastInsertRowid });
+});
+
+app.delete("/api/tire-payments/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const info = db.prepare("DELETE FROM tire_payments WHERE id = ?").run(id);
+  if (info.changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
+  res.json({ ok: true });
+});
+
+// 5. Reports Endpoint
+app.get("/api/tire-reports/summary", (req, res) => {
+  const from = req.query.from || "";
+  const to = req.query.to || "";
+  
+  let salesSql = `
+    SELECT 
+      COALESCE(SUM(total_usd), 0) AS total_sales_usd,
+      COALESCE(SUM(total_iqd), 0) AS total_sales_iqd,
+      COALESCE(SUM(paid_usd), 0) AS total_paid_usd,
+      COALESCE(SUM(paid_iqd), 0) AS total_paid_iqd
+    FROM tire_sales WHERE 1=1
+  `;
+  const salesParams = [];
+  if (from) { salesSql += " AND sale_date >= ?"; salesParams.push(from); }
+  if (to) { salesSql += " AND sale_date <= ?"; salesParams.push(to); }
+  const sales = db.prepare(salesSql).get(...salesParams);
+  
+  let paySql = `
+    SELECT 
+      COALESCE(SUM(amount_usd), 0) AS total_payments_usd,
+      COALESCE(SUM(amount_iqd), 0) AS total_payments_iqd
+    FROM tire_payments WHERE 1=1
+  `;
+  const payParams = [];
+  if (from) { paySql += " AND payment_date >= ?"; payParams.push(from); }
+  if (to) { paySql += " AND payment_date <= ?"; payParams.push(to); }
+  const payments = db.prepare(paySql).get(...payParams);
+  
+  let popSql = `
+    SELECT t.name, SUM(i.quantity) AS sold_qty
+    FROM tire_sale_items i
+    JOIN tires_inventory t ON t.id = i.tire_id
+    JOIN tire_sales s ON s.id = i.sale_id
+    WHERE 1=1
+  `;
+  const popParams = [];
+  if (from) { popSql += " AND s.sale_date >= ?"; popParams.push(from); }
+  if (to) { popSql += " AND s.sale_date <= ?"; popParams.push(to); }
+  popSql += " GROUP BY i.tire_id ORDER BY sold_qty DESC LIMIT 10";
+  const popularTires = db.prepare(popSql).all(...popParams);
+  
+  const stock = db.prepare(`
+    SELECT 
+      SUM(quantity * purchase_price_usd) AS stock_value_purchase_usd,
+      SUM(quantity * sale_price_usd) AS stock_value_sale_usd,
+      SUM(quantity) AS total_tires_count
+    FROM tires_inventory
+  `).get();
+  
+  const totalOwedSales = db.prepare("SELECT SUM(total_usd - paid_usd) AS owed_usd, SUM(total_iqd - paid_iqd) AS owed_iqd FROM tire_sales").get();
+  const totalPayments = db.prepare("SELECT SUM(amount_usd) AS paid_usd, SUM(amount_iqd) AS paid_iqd FROM tire_payments").get();
+  
+  const outstandingDebtUsd = (totalOwedSales.owed_usd || 0) - (totalPayments.paid_usd || 0);
+  const outstandingDebtIqd = (totalOwedSales.owed_iqd || 0) - (totalPayments.paid_iqd || 0);
+  
+  res.json({
+    total_sales_usd: sales.total_sales_usd,
+    total_sales_iqd: sales.total_sales_iqd,
+    total_cash_usd: sales.total_paid_usd + payments.total_payments_usd,
+    total_cash_iqd: sales.total_paid_iqd + payments.total_payments_iqd,
+    outstanding_debt_usd: outstandingDebtUsd,
+    outstanding_debt_iqd: outstandingDebtIqd,
+    stock_value_purchase_usd: stock.stock_value_purchase_usd || 0,
+    stock_value_sale_usd: stock.stock_value_sale_usd || 0,
+    total_tires_count: stock.total_tires_count || 0,
+    popular_tires: popularTires
+  });
+});
+
+
 const clientDist = path.join(__dirname, "..", "client", "dist");
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(clientDist));

@@ -113,6 +113,28 @@ const IconReport = () => (
   </svg>
 );
 
+const IconInventory = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+);
+const IconTireSales = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6z" />
+    <path d="M3 6h18M16 10a4 4 0 01-8 0" />
+  </svg>
+);
+const IconTireDebtors = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+const IconTireReports = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+  </svg>
+);
+
 export default function App() {
   const [tab, setTab] = useState("daily");
   const [debtors, setDebtors] = useState([]);
@@ -162,7 +184,80 @@ export default function App() {
   const [reportTo, setReportTo] = useState("");
   const [reportLoading, setReportLoading] = useState(false);
 
+  /* ─── تایە فرۆشتن و مخزن state ─── */
+  const [tires, setTires] = useState([]);
+  const [tireForm, setTireForm] = useState({ name: "", size: "", quantity: "", purchase_price_usd: "", sale_price_usd: "" });
+  const [editingTireId, setEditingTireId] = useState(null);
+  const [tireSearch, setTireSearch] = useState("");
+  
+  const [tireCustomers, setTireCustomers] = useState([]);
+  const [tireCustomerForm, setTireCustomerForm] = useState({ name: "", phone: "", note: "" });
+  const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
+  const [tireCustomerSearch, setTireCustomerSearch] = useState("");
+  
+  const [tireSales, setTireSales] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [cartForm, setCartForm] = useState({ tire_id: "", quantity: "1", price_usd: "", price_iqd: "" });
+  const [saleForm, setSaleForm] = useState({
+    sale_date: today,
+    customer_id: "",
+    payment_type: "نەقد",
+    paid_usd: "",
+    paid_iqd: "",
+    note: ""
+  });
+  
+  const [tirePayments, setTirePayments] = useState([]);
+  const [tirePaymentForm, setTirePaymentForm] = useState({
+    customer_id: "",
+    payment_date: today,
+    amount_usd: "",
+    amount_iqd: "",
+    note: ""
+  });
+  const [activeTireCustomerTab, setActiveTireCustomerTab] = useState("customers"); // customers, payments
+  const [focusedTireCustomerId, setFocusedTireCustomerId] = useState("");
+  const [focusedTireCustomerDetail, setFocusedTireCustomerDetail] = useState(null);
+  
+  const [tireReport, setTireReport] = useState(null);
+  const [tireReportFrom, setTireReportFrom] = useState("");
+  const [tireReportTo, setTireReportTo] = useState("");
+  const [tireReportLoading, setTireReportLoading] = useState(false);
+
   /* ───────── API helpers ───────── */
+
+  const loadTires = useCallback(async () => {
+    const r = await fetch(`${API}/tires`);
+    if (r.ok) setTires(await r.json());
+  }, []);
+
+  const loadTireCustomers = useCallback(async () => {
+    const r = await fetch(`${API}/tire-customers`);
+    if (r.ok) setTireCustomers(await r.json());
+  }, []);
+
+  const loadTireSales = useCallback(async () => {
+    const r = await fetch(`${API}/tire-sales`);
+    if (r.ok) setTireSales(await r.json());
+  }, []);
+
+  const loadTirePayments = useCallback(async () => {
+    const r = await fetch(`${API}/tire-payments`);
+    if (r.ok) setTirePayments(await r.json());
+  }, []);
+
+  const loadTireReport = useCallback(async () => {
+    setTireReportLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (tireReportFrom) p.set("from", tireReportFrom);
+      if (tireReportTo) p.set("to", tireReportTo);
+      const r = await fetch(`${API}/tire-reports/summary?` + p.toString());
+      if (r.ok) setTireReport(await r.json());
+    } finally {
+      setTireReportLoading(false);
+    }
+  }, [tireReportFrom, tireReportTo]);
 
   const loadDebtors = useCallback(async () => {
     const r = await fetch(`${API}/debtors`);
@@ -292,6 +387,42 @@ export default function App() {
   useEffect(() => {
     if (tab === "report") loadReport();
   }, [tab, loadReport]);
+
+  /* بارکردنی داتای بەشی تایە کاتێک تابەکان دەگۆڕێن */
+  useEffect(() => {
+    if (tab === "tire_inventory") {
+      loadTires();
+    } else if (tab === "tire_sales") {
+      loadTires();
+      loadTireCustomers();
+      loadTireSales();
+    } else if (tab === "tire_debtors") {
+      loadTireCustomers();
+      loadTirePayments();
+    } else if (tab === "tire_reports") {
+      loadTireReport();
+    }
+  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport]);
+
+  /* نوێکردنەوەی کورتەی قەرزداری تایەی هەڵبژێردراو */
+  useEffect(() => {
+    if (tab !== "tire_debtors" || !focusedTireCustomerId) {
+      setFocusedTireCustomerDetail(null);
+      return;
+    }
+    let cancel = false;
+    (async () => {
+      const r = await fetch(`${API}/tire-customers`);
+      if (r.ok && !cancel) {
+        const list = await r.json();
+        const found = list.find((c) => String(c.id) === String(focusedTireCustomerId));
+        if (found) setFocusedTireCustomerDetail(found);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [tab, focusedTireCustomerId, tirePayments, tireSales]);
 
   /* ───────── Debtor actions ───────── */
 
@@ -439,6 +570,289 @@ export default function App() {
     window.setTimeout(() => setInfoMsg(""), 3000);
   }
 
+  /* ───────── Tire Inventory Actions ───────── */
+
+  async function submitTire(e) {
+    e.preventDefault();
+    setErr("");
+    setInfoMsg("");
+    const body = {
+      name: tireForm.name.trim(),
+      size: tireForm.size.trim(),
+      quantity: num(tireForm.quantity),
+      purchase_price_usd: num(tireForm.purchase_price_usd),
+      sale_price_usd: num(tireForm.sale_price_usd),
+    };
+    try {
+      let r;
+      if (editingTireId) {
+        r = await fetch(`${API}/tires/${editingTireId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } else {
+        r = await fetch(`${API}/tires`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      setTireForm({ name: "", size: "", quantity: "", purchase_price_usd: "", sale_price_usd: "" });
+      setEditingTireId(null);
+      await loadTires();
+      setInfoMsg(editingTireId ? "تایە نوێکرایەوە." : "تایە زیادکرا بۆ مخزن.");
+      window.setTimeout(() => setInfoMsg(""), 3000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
+
+  async function deleteTire(id) {
+    if (!confirm("ئایا دڵنیای لە سڕینەوەی ئەم تایەیە لە مخزن؟")) return;
+    await fetch(`${API}/tires/${id}`, { method: "DELETE" });
+    await loadTires();
+    setInfoMsg("تایە سڕایەوە.");
+    window.setTimeout(() => setInfoMsg(""), 3000);
+  }
+
+  function startEditTire(t) {
+    setEditingTireId(t.id);
+    setTireForm({
+      name: t.name,
+      size: t.size,
+      quantity: String(t.quantity),
+      purchase_price_usd: String(t.purchase_price_usd),
+      sale_price_usd: String(t.sale_price_usd),
+    });
+  }
+
+  function cancelEditTire() {
+    setEditingTireId(null);
+    setTireForm({ name: "", size: "", quantity: "", purchase_price_usd: "", sale_price_usd: "" });
+  }
+
+  /* ───────── Tire Customer Actions ───────── */
+
+  async function submitTireCustomer(e) {
+    e.preventDefault();
+    setErr("");
+    setInfoMsg("");
+    try {
+      const r = await fetch(`${API}/tire-customers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tireCustomerForm),
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      setTireCustomerForm({ name: "", phone: "", note: "" });
+      setShowAddCustomerForm(false);
+      await loadTireCustomers();
+      setInfoMsg("قەرزداری تایە بە سەرکەوتوویی زیادکرا.");
+      window.setTimeout(() => setInfoMsg(""), 3000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
+
+  /* ───────── Tire Sales Actions ───────── */
+
+  function addToCart(e) {
+    e.preventDefault();
+    setErr("");
+    const tireId = Number(cartForm.tire_id);
+    const qty = Number(cartForm.quantity) || 0;
+    const prcUsd = Number(cartForm.price_usd) || 0;
+    const prcIqd = Number(cartForm.price_iqd) || 0;
+
+    if (!tireId) {
+      setErr("تایەیەک هەڵبژێرە");
+      return;
+    }
+    if (qty <= 0) {
+      setErr("بڕی فرۆشراو دەبێت لە سفر گەورەتر بێت");
+      return;
+    }
+
+    const selectedTire = tires.find((t) => t.id === tireId);
+    if (!selectedTire) return;
+
+    if (selectedTire.quantity < qty) {
+      setErr(`بڕی پێویست لە مخزن نییە. بڕی ماوە: ${selectedTire.quantity}`);
+      return;
+    }
+
+    // Check if item already exists in cart, if so update it
+    const idx = cart.findIndex((item) => item.tire_id === tireId);
+    if (idx !== -1) {
+      const newCart = [...cart];
+      newCart[idx].quantity += qty;
+      setCart(newCart);
+    } else {
+      setCart([...cart, {
+        tire_id: tireId,
+        tire_name: selectedTire.name,
+        quantity: qty,
+        price_usd: prcUsd,
+        price_iqd: prcIqd
+      }]);
+    }
+
+    setCartForm({ tire_id: "", quantity: "1", price_usd: "", price_iqd: "" });
+  }
+
+  function removeFromCart(index) {
+    const newCart = [...cart];
+    newCart.splice(index, 1);
+    setCart(newCart);
+  }
+
+  async function submitTireSale(e) {
+    e.preventDefault();
+    setErr("");
+    setInfoMsg("");
+
+    if (cart.length === 0) {
+      setErr("سەبەتەی کڕین خاڵیە. سەرەتا تایە زیاد بکە.");
+      return;
+    }
+
+    const isCredit = saleForm.payment_type === "قەرز";
+    if (isCredit && !saleForm.customer_id) {
+      setErr("بۆ فرۆشتنی قەرز، دەبێت ناوێک لە لیستی قەرزداران هەڵبژێریت یان زیادی بکەیت.");
+      return;
+    }
+
+    // Calculate totals
+    let totUsd = 0;
+    let totIqd = 0;
+    cart.forEach((item) => {
+      totUsd += (item.price_usd || 0) * item.quantity;
+      totIqd += (item.price_iqd || 0) * item.quantity;
+    });
+
+    const body = {
+      customer_id: isCredit ? Number(saleForm.customer_id) : null,
+      sale_date: saleForm.sale_date,
+      payment_type: saleForm.payment_type,
+      total_usd: totUsd,
+      total_iqd: totIqd,
+      paid_usd: isCredit ? (Number(saleForm.paid_usd) || 0) : totUsd,
+      paid_iqd: isCredit ? (Number(saleForm.paid_iqd) || 0) : totIqd,
+      note: saleForm.note.trim(),
+      items: cart.map(i => ({
+        tire_id: i.tire_id,
+        quantity: i.quantity,
+        price_usd: i.price_usd,
+        price_iqd: i.price_iqd
+      }))
+    };
+
+    try {
+      const r = await fetch(`${API}/tire-sales`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      setCart([]);
+      setSaleForm({
+        sale_date: today,
+        customer_id: "",
+        payment_type: "نەقد",
+        paid_usd: "",
+        paid_iqd: "",
+        note: ""
+      });
+      await loadTires();
+      await loadTireSales();
+      await loadTireCustomers();
+      setInfoMsg("فرۆشتنی تایە بە سەرکەوتوویی تۆمار کرا.");
+      window.setTimeout(() => setInfoMsg(""), 3000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
+
+  async function deleteTireSale(id) {
+    if (!confirm("سڕینەوەی ئەم فەسڵە؟ (بڕی تایەکان دەگەڕێتەوە بۆ مخزن)")) return;
+    await fetch(`${API}/tire-sales/${id}`, { method: "DELETE" });
+    await loadTires();
+    await loadTireSales();
+    await loadTireCustomers();
+    setInfoMsg("فەسڵەکە سڕایەوە و مخزن نوێکرایەوە.");
+    window.setTimeout(() => setInfoMsg(""), 3000);
+  }
+
+  /* ───────── Tire Payment Actions ───────── */
+
+  async function submitTirePayment(e) {
+    e.preventDefault();
+    setErr("");
+    setInfoMsg("");
+
+    const body = {
+      customer_id: Number(tirePaymentForm.customer_id),
+      payment_date: tirePaymentForm.payment_date,
+      amount_usd: num(tirePaymentForm.amount_usd),
+      amount_iqd: num(tirePaymentForm.amount_iqd),
+      note: tirePaymentForm.note.trim()
+    };
+
+    if (!body.customer_id) {
+      setErr("قەرزدار هەڵبژێرە");
+      return;
+    }
+
+    try {
+      const r = await fetch(`${API}/tire-payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      setTirePaymentForm({
+        customer_id: "",
+        payment_date: today,
+        amount_usd: "",
+        amount_iqd: "",
+        note: ""
+      });
+      await loadTirePayments();
+      await loadTireCustomers();
+      setInfoMsg("واسڵکردنی قەرز بە سەرکەوتوویی تۆمار کرا.");
+      window.setTimeout(() => setInfoMsg(""), 3000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
+
+  async function deleteTirePayment(id) {
+    if (!confirm("سڕینەوەی ئەم واسڵکردنە؟")) return;
+    await fetch(`${API}/tire-payments/${id}`, { method: "DELETE" });
+    await loadTirePayments();
+    await loadTireCustomers();
+    setInfoMsg("تۆماری پارەکە سڕایەوە.");
+    window.setTimeout(() => setInfoMsg(""), 3000);
+  }
+
   /* ───────── Computed ───────── */
 
   const filteredDebtorPick = useMemo(() => {
@@ -478,6 +892,45 @@ export default function App() {
     );
   }, [debtors, debtorSearch]);
 
+  const filteredTires = useMemo(() => {
+    const q = tireSearch.trim().toLowerCase();
+    if (!q) return tires;
+    return tires.filter(
+      (t) =>
+        String(t.name || "").toLowerCase().includes(q) ||
+        String(t.size || "").toLowerCase().includes(q)
+    );
+  }, [tires, tireSearch]);
+
+  const filteredTireCustomers = useMemo(() => {
+    const q = tireCustomerSearch.trim().toLowerCase();
+    if (!q) return tireCustomers;
+    return tireCustomers.filter(
+      (c) =>
+        String(c.name || "").toLowerCase().includes(q) ||
+        String(c.phone || "").toLowerCase().includes(q) ||
+        String(c.note || "").toLowerCase().includes(q)
+    );
+  }, [tireCustomers, tireCustomerSearch]);
+
+  const tireCustomersTotals = useMemo(() => {
+    let usd = 0, iqd = 0;
+    tireCustomers.forEach((c) => {
+      usd += c.balance_usd || 0;
+      iqd += c.balance_iqd || 0;
+    });
+    return { usd, iqd };
+  }, [tireCustomers]);
+
+  const cartTotals = useMemo(() => {
+    let usd = 0, iqd = 0;
+    cart.forEach((i) => {
+      usd += (i.price_usd || 0) * i.quantity;
+      iqd += (i.price_iqd || 0) * i.quantity;
+    });
+    return { usd, iqd };
+  }, [cart]);
+
   function patchTxnForm(updates) {
     setTxnForm((prev) => {
       const next = { ...prev, ...updates };
@@ -515,6 +968,21 @@ export default function App() {
           </button>
           <button type="button" className={tab === "report" ? "on" : ""} onClick={() => switchTab("report")}>
             <IconReport /> ڕاپۆرت
+          </button>
+          
+          <span className="nav-separator"></span>
+          
+          <button type="button" className={tab === "tire_inventory" ? "on" : ""} onClick={() => switchTab("tire_inventory")}>
+            <IconInventory /> مخزنی تایە
+          </button>
+          <button type="button" className={tab === "tire_sales" ? "on" : ""} onClick={() => switchTab("tire_sales")}>
+            <IconTireSales /> فرۆشتنی تایە
+          </button>
+          <button type="button" className={tab === "tire_debtors" ? "on" : ""} onClick={() => switchTab("tire_debtors")}>
+            <IconTireDebtors /> قەرزدارانی تایە
+          </button>
+          <button type="button" className={tab === "tire_reports" ? "on" : ""} onClick={() => switchTab("tire_reports")}>
+            <IconTireReports /> ڕاپۆرتی تایە
           </button>
         </nav>
       </header>
@@ -1128,6 +1596,718 @@ export default function App() {
                   </div>
                 ) : (
                   <p className="muted" style={{ textAlign: "center" }}>هیچ مسروفێک تۆمار نەکراوە.</p>
+                )}
+              </section>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: مخزنی تایە (Tire Inventory) ═══════ */}
+      {tab === "tire_inventory" ? (
+        <div className="tab-panels">
+          <section className="card" aria-labelledby="tire-add-heading">
+            <h2 id="tire-add-heading">{editingTireId ? "دەستکاریکردنی زانیاری تایە" : "زیادکردنی تایە بۆ مخزن"}</h2>
+            <form className="grid-form" onSubmit={submitTire}>
+              <label>
+                ناونیشان / جۆری تایە
+                <input
+                  value={tireForm.name}
+                  onChange={(e) => setTireForm({ ...tireForm, name: e.target.value })}
+                  placeholder="بۆ نموونە: Michelin 205/55R16"
+                  required
+                />
+              </label>
+              <label>
+                قەبارە (Size)
+                <input
+                  value={tireForm.size}
+                  onChange={(e) => setTireForm({ ...tireForm, size: e.target.value })}
+                  placeholder="بۆ نموونە: R16"
+                />
+              </label>
+              <label>
+                بڕی سەرەتایی (مخزن)
+                <input
+                  type="number"
+                  value={tireForm.quantity}
+                  onChange={(e) => setTireForm({ ...tireForm, quantity: e.target.value })}
+                  placeholder="0"
+                  required
+                />
+              </label>
+              <label>
+                نرخی کڕین بە دۆلار ($)
+                <input
+                  inputMode="decimal"
+                  value={tireForm.purchase_price_usd}
+                  onChange={(e) => setTireForm({ ...tireForm, purchase_price_usd: e.target.value })}
+                  placeholder="0.00"
+                />
+              </label>
+              <label>
+                نرخی فرۆشتن بە دۆلار ($)
+                <input
+                  inputMode="decimal"
+                  value={tireForm.sale_price_usd}
+                  onChange={(e) => setTireForm({ ...tireForm, sale_price_usd: e.target.value })}
+                  placeholder="0.00"
+                />
+              </label>
+              <div className="span2" style={{ display: "flex", gap: "0.5rem" }}>
+                <button type="submit" className="primary">
+                  {editingTireId ? "پاشەکەوتکردنی گۆڕانکارییەکان" : "زیادکردن بۆ مخزن"}
+                </button>
+                {editingTireId ? (
+                  <button type="button" className="ghost" onClick={cancelEditTire}>
+                    پاشگەزبوونەوە
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          </section>
+
+          {/* کورتەی مخزن */}
+          <section className="card">
+            <div className="expense-summary-bar" style={{ background: "var(--pay-bg)", borderColor: "var(--pay-border)" }}>
+              <div className="expense-total">
+                <span className="lbl" style={{ color: "var(--text)" }}>کۆی جۆری تایەکان</span>
+                <strong className="expense-amount" style={{ color: "var(--ok)" }}>{tires.length} دانە</strong>
+              </div>
+              <div className="expense-total">
+                <span className="lbl" style={{ color: "var(--text)" }}>کۆی گشتی ژمارەی تایەکان</span>
+                <strong className="expense-amount" style={{ color: "var(--ok)" }}>
+                  {tires.reduce((acc, curr) => acc + (curr.quantity || 0), 0)} دانە
+                </strong>
+              </div>
+            </div>
+          </section>
+
+          {/* لیستی تایەکان */}
+          <section className="card" aria-labelledby="tire-list-heading">
+            <div className="section-head">
+              <h2 id="tire-list-heading">مخزنی تایەکان</h2>
+              <div className="filter-row">
+                <label className="filter-label">
+                  گەڕان لە مخزندا
+                  <input
+                    value={tireSearch}
+                    onChange={(e) => setTireSearch(e.target.value)}
+                    placeholder="بنووسە بۆ گەڕان…"
+                    style={{ width: "220px" }}
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>جۆری تایە</th>
+                    <th>قەبارە</th>
+                    <th>بڕی ماوە (مخزن)</th>
+                    <th>نرخی کڕین ($)</th>
+                    <th>نرخی فرۆشتن ($)</th>
+                    <th>کۆی نرخی مخزن</th>
+                    <th>کردارەکان</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTires.map((t) => (
+                    <tr key={t.id}>
+                      <td style={{ fontWeight: "600" }}>{t.name}</td>
+                      <td>{t.size || "—"}</td>
+                      <td className={`num ${t.quantity <= 5 ? "debt" : ""}`} style={{ fontWeight: "700" }}>
+                        {t.quantity} دانە {t.quantity <= 5 ? "(کەمە!)" : ""}
+                      </td>
+                      <td className="num">{fmtMoney(t.purchase_price_usd, "usd")}</td>
+                      <td className="num" style={{ color: "var(--ok)" }}>{fmtMoney(t.sale_price_usd, "usd")}</td>
+                      <td className="num muted">{fmtMoney(t.quantity * t.purchase_price_usd, "usd")}</td>
+                      <td>
+                        <div style={{ display: "flex", gap: "0.25rem" }}>
+                          <button type="button" className="ghost" style={{ minHeight: "1.8rem", padding: "0.2rem 0.5rem" }} onClick={() => startEditTire(t)}>
+                            دەستکاری
+                          </button>
+                          <button type="button" className="danger link" onClick={() => deleteTire(t.id)}>
+                            سڕینەوە
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredTires.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
+                        هیچ تایەیەک لە مخزن نییە.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: فرۆشتنی تایە (Tire Sales) ═══════ */}
+      {tab === "tire_sales" ? (
+        <div className="tab-panels">
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "1rem", alignItems: "start" }}>
+            {/* لای چەپ: سەبەتە و تۆمارکردن */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <section className="card card-compact" aria-labelledby="tire-cart-heading">
+                <h2 id="tire-cart-heading">فرۆشتنی تایە — سەبەتەی کڕین</h2>
+                <form className="grid-form" onSubmit={addToCart}>
+                  <label className="span2">
+                    تایە هەڵبژێرە (مخزن)
+                    <select
+                      value={cartForm.tire_id}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const match = tires.find((t) => String(t.id) === val);
+                        setCartForm({
+                          ...cartForm,
+                          tire_id: val,
+                          price_usd: match ? String(match.sale_price_usd) : "",
+                        });
+                      }}
+                      required
+                    >
+                      <option value="">— هەڵبژێرە —</option>
+                      {tires.map((t) => (
+                        <option key={t.id} value={t.id} disabled={t.quantity <= 0}>
+                          {t.name} (ماوە: {t.quantity}) — {fmtMoney(t.sale_price_usd, "usd")}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    بڕ (Quantity)
+                    <input
+                      type="number"
+                      value={cartForm.quantity}
+                      onChange={(e) => setCartForm({ ...cartForm, quantity: e.target.value })}
+                      min="1"
+                      required
+                    />
+                  </label>
+                  <label>
+                    نرخی فرۆشتن بە دۆلار ($)
+                    <input
+                      inputMode="decimal"
+                      value={cartForm.price_usd}
+                      onChange={(e) => setCartForm({ ...cartForm, price_usd: e.target.value })}
+                      placeholder="0.00"
+                      required
+                    />
+                  </label>
+                  <label>
+                    نرخی فرۆشتن بە دینار (ئیختیاری)
+                    <input
+                      inputMode="numeric"
+                      value={cartForm.price_iqd}
+                      onChange={(e) => setCartForm({ ...cartForm, price_iqd: e.target.value })}
+                      placeholder="0"
+                    />
+                  </label>
+                  <button type="submit" className="primary span2" style={{ justifySelf: "stretch" }}>
+                    زیادکردن بۆ سەبەتە
+                  </button>
+                </form>
+              </section>
+
+              {/* پێرستی سەبەتە */}
+              <section className="card">
+                <h3>سەبەتەی کڕین ({cart.length} بابەت)</h3>
+                <div className="table-wrap">
+                  <table className="data compact">
+                    <thead>
+                      <tr>
+                        <th>بابەت</th>
+                        <th>بڕ</th>
+                        <th>نرخ ($)</th>
+                        <th>نرخ (IQD)</th>
+                        <th>کۆ ($)</th>
+                        <th>کردار</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cart.map((item, index) => (
+                        <tr key={index}>
+                          <td>{item.tire_name}</td>
+                          <td>{item.quantity} دانە</td>
+                          <td className="num">{fmtMoney(item.price_usd, "usd")}</td>
+                          <td className="num">{item.price_iqd ? fmtMoney(item.price_iqd, "iqd") : "—"}</td>
+                          <td className="num" style={{ fontWeight: "600" }}>{fmtMoney(item.price_usd * item.quantity, "usd")}</td>
+                          <td>
+                            <button type="button" className="danger link" onClick={() => removeFromCart(index)}>
+                              سڕینەوە
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {cart.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="muted" style={{ textAlign: "center", padding: "1.5rem" }}>
+                            هیچ بابەتێک لە سەبەتەدا نییە.
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+
+                {cart.length > 0 ? (
+                  <div className="balance-inline" style={{ marginTop: "1rem", width: "100%" }}>
+                    <div>
+                      <span className="lbl">کۆی گشتی بە دۆلار ($)</span>
+                      <strong>{fmtMoney(cartTotals.usd, "usd")}</strong>
+                    </div>
+                    <div>
+                      <span className="lbl">کۆی گشتی بە دینار (IQD)</span>
+                      <strong>{fmtMoney(cartTotals.iqd, "iqd")}</strong>
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+            </div>
+
+            {/* لای ڕاست: کڕیار و فەسڵکردن */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <section className="card" aria-labelledby="tire-checkout-heading">
+                <h2 id="tire-checkout-heading">تەواوکردنی فرۆشتن</h2>
+                <form className="grid-form" onSubmit={submitTireSale}>
+                  <label className="span2">
+                    ڕێکەوتی فرۆشتن
+                    <input
+                      type="date"
+                      value={saleForm.sale_date}
+                      onChange={(e) => setSaleForm({ ...saleForm, sale_date: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label className="span2">
+                    جۆری پارەدان
+                    <select
+                      value={saleForm.payment_type}
+                      onChange={(e) => setSaleForm({ ...saleForm, payment_type: e.target.value })}
+                      required
+                    >
+                      <option value="نەقد">نەقد (کاش)</option>
+                      <option value="قەرز">قەرز</option>
+                    </select>
+                  </label>
+
+                  {saleForm.payment_type === "قەرز" ? (
+                    <>
+                      <label className="span2">
+                        قەرزدار هەڵبژێرە
+                        <select
+                          value={saleForm.customer_id}
+                          onChange={(e) => setSaleForm({ ...saleForm, customer_id: e.target.value })}
+                          required
+                        >
+                          <option value="">— هەڵبژێرە —</option>
+                          {tireCustomers.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} (قەرز: {fmtMoney(c.balance_usd, "usd")})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="span2" style={{ marginTop: "-0.5rem" }}>
+                        <button type="button" className="ghost" style={{ width: "100%", fontSize: "0.8rem", minHeight: "2rem" }} onClick={() => setShowAddCustomerForm(!showAddCustomerForm)}>
+                          {showAddCustomerForm ? "داخستنی فۆرمی زیادکردنی قەرزدار" : "➕ زیادکردنی قەرزداری نوێ بۆ ئەم بەشە"}
+                        </button>
+                      </div>
+
+                      {showAddCustomerForm ? (
+                        <div className="card-nested span2" style={{ margin: "0.5rem 0", background: "#f8fafc" }}>
+                          <h4>زیادکردنی قەرزداری تایە</h4>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                            <input
+                              value={tireCustomerForm.name}
+                              onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, name: e.target.value })}
+                              placeholder="ناوی قەرزدار"
+                            />
+                            <input
+                              value={tireCustomerForm.phone}
+                              onChange={(e) => setTireCustomerForm({ ...tireCustomerForm, phone: e.target.value })}
+                              placeholder="مۆبایل"
+                            />
+                            <button type="button" className="primary" style={{ width: "100%", minHeight: "2rem" }} onClick={submitTireCustomer}>
+                              پاشەکەوتکردن
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <label>
+                        پارەی دراو بە دۆلار ($)
+                        <input
+                          inputMode="decimal"
+                          value={saleForm.paid_usd}
+                          onChange={(e) => setSaleForm({ ...saleForm, paid_usd: e.target.value })}
+                          placeholder="0.00"
+                        />
+                      </label>
+                      <label>
+                        پارەی دراو بە دینار (IQD)
+                        <input
+                          inputMode="numeric"
+                          value={saleForm.paid_iqd}
+                          onChange={(e) => setSaleForm({ ...saleForm, paid_iqd: e.target.value })}
+                          placeholder="0"
+                        />
+                      </label>
+                    </>
+                  ) : null}
+
+                  <label className="span2">
+                    تێبینی فەسڵ
+                    <input
+                      value={saleForm.note}
+                      onChange={(e) => setSaleForm({ ...saleForm, note: e.target.value })}
+                      placeholder="ئیختیاری"
+                    />
+                  </label>
+
+                  <button type="submit" className="primary span2" style={{ justifySelf: "stretch" }} disabled={cart.length === 0}>
+                    فرۆشتن و واژۆکردنی فەسڵ
+                  </button>
+                </form>
+              </section>
+            </div>
+          </div>
+
+          {/* دوایین فرۆشتنەکان */}
+          <section className="card" aria-labelledby="tire-sales-history">
+            <h2 id="tire-sales-history">تۆماری فرۆشتنی تایەکان</h2>
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>ڕێکەوت</th>
+                    <th>کڕیار / جۆر</th>
+                    <th>تایە فرۆشراوەکان</th>
+                    <th>کۆی فەسڵ</th>
+                    <th>دراو / ماوە</th>
+                    <th>تێبینی</th>
+                    <th>کردار</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tireSales.map((s) => (
+                    <tr key={s.id}>
+                      <td>{s.sale_date}</td>
+                      <td>
+                        <strong>{s.customer_name || "نەقد (کاش)"}</strong>
+                        <div className="muted small">{s.payment_type}</div>
+                      </td>
+                      <td style={{ fontSize: "0.82rem" }}>
+                        {(s.items || []).map((item, idx) => (
+                          <div key={idx}>
+                            • {item.tire_name} ({item.quantity} دانە × {fmtMoney(item.price_usd, "usd")})
+                          </div>
+                        ))}
+                      </td>
+                      <td className="num">
+                        <div>{fmtMoney(s.total_usd, "usd")}</div>
+                        {s.total_iqd ? <div className="muted small">{fmtMoney(s.total_iqd, "iqd")}</div> : null}
+                      </td>
+                      <td className="num">
+                        {s.payment_type === "قەرز" ? (
+                          <>
+                            <div style={{ color: "var(--ok)" }}>دراو: {fmtMoney(s.paid_usd, "usd")}</div>
+                            <div style={{ color: "var(--owe)", fontWeight: "600" }}>
+                              ماوە: {fmtMoney(s.total_usd - s.paid_usd, "usd")}
+                            </div>
+                          </>
+                        ) : (
+                          <span style={{ color: "var(--ok)" }}>تەواو دراوە</span>
+                        )}
+                      </td>
+                      <td className="muted">{s.note}</td>
+                      <td>
+                        <button type="button" className="danger link" onClick={() => deleteTireSale(s.id)}>
+                          سڕینەوە
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {tireSales.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
+                        هیچ فرۆشتنێک تۆمار نەکراوە.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: قەرزدارانی تایە (Tire Debtors) ═══════ */}
+      {tab === "tire_debtors" ? (
+        <div className="tab-panels">
+          {/* کورتەی کۆی قەرزی تایەکان */}
+          <section className="card">
+            <div className="expense-summary-bar" style={{ background: "var(--debt-bg)", borderColor: "var(--debt-border)" }}>
+              <div className="expense-total">
+                <span className="lbl" style={{ color: "var(--text)" }}>کۆ قەرزی تایە بە دۆلار ($)</span>
+                <strong className="expense-amount" style={{ color: "var(--owe)" }}>{fmtMoney(tireCustomersTotals.usd, "usd")}</strong>
+              </div>
+              <div className="expense-total">
+                <span className="lbl" style={{ color: "var(--text)" }}>کۆ قەرزی تایە بە دینار (IQD)</span>
+                <strong className="expense-amount" style={{ color: "var(--owe)" }}>{fmtMoney(tireCustomersTotals.iqd, "iqd")}</strong>
+              </div>
+            </div>
+          </section>
+
+          <div style={{ display: "grid", gridTemplateColumns: focusedTireCustomerId ? "1.2fr 0.8fr" : "1fr", gap: "1rem", alignItems: "start" }}>
+            {/* لیستی قەرزدارانی تایە */}
+            <section className="card" aria-labelledby="tire-debtors-list">
+              <div className="section-head">
+                <h2 id="tire-debtors-list">لیستی قەرزدارانی تایە</h2>
+                <div className="filter-row">
+                  <input
+                    value={tireCustomerSearch}
+                    onChange={(e) => setTireCustomerSearch(e.target.value)}
+                    placeholder="گەڕان بەپێی ناو یان مۆبایل…"
+                    style={{ width: "220px" }}
+                  />
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th>ناو</th>
+                      <th>مۆبایل</th>
+                      <th>ماوەی قەرز ($)</th>
+                      <th>ماوەی قەرز (IQD)</th>
+                      <th>تێبینی</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTireCustomers.map((c) => (
+                      <tr key={c.id} className={String(focusedTireCustomerId) === String(c.id) ? "row-focus" : ""}>
+                        <td>
+                          <button type="button" className="name-link" onClick={() => setFocusedTireCustomerId(String(c.id))}>
+                            {c.name}
+                          </button>
+                        </td>
+                        <td>{c.phone}</td>
+                        <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(c.balance_usd, "usd")}</td>
+                        <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(c.balance_iqd, "iqd")}</td>
+                        <td className="muted">{c.note}</td>
+                      </tr>
+                    ))}
+                    {filteredTireCustomers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
+                          هیچ قەرزدارێکی تایە نەدۆزرایەوە.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* پانێڵی لای ڕاست: وەرگرتنی پارەی قەرز */}
+            {focusedTireCustomerId && focusedTireCustomerDetail ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <section className="card" aria-labelledby="tire-pay-heading">
+                  <div className="debtor-detail-head">
+                    <h2 id="tire-pay-heading">وەرگرتنەوەی قەرز — {focusedTireCustomerDetail.name}</h2>
+                    <button type="button" className="ghost" style={{ minHeight: "1.8rem" }} onClick={() => setFocusedTireCustomerId("")}>
+                      داخستن
+                    </button>
+                  </div>
+                  
+                  <div className="balance-inline" style={{ width: "100%", margin: "0.5rem 0 1rem", background: "var(--debt-bg)" }}>
+                    <div>
+                      <span className="lbl">ماوەی قەرز بە دۆلار</span>
+                      <strong style={{ color: "var(--owe)" }}>{fmtMoney(focusedTireCustomerDetail.balance_usd, "usd")}</strong>
+                    </div>
+                    <div>
+                      <span className="lbl">ماوەی قەرز بە دینار</span>
+                      <strong style={{ color: "var(--owe)" }}>{fmtMoney(focusedTireCustomerDetail.balance_iqd, "iqd")}</strong>
+                    </div>
+                  </div>
+
+                  <form className="grid-form" onSubmit={submitTirePayment}>
+                    <label className="span2">
+                      ڕێکەوتی وەرگرتن
+                      <input
+                        type="date"
+                        value={tirePaymentForm.payment_date}
+                        onChange={(e) => setTirePaymentForm({ ...tirePaymentForm, payment_date: e.target.value })}
+                        required
+                      />
+                    </label>
+                    <label>
+                      بڕی وەرگیراو بە دۆلار ($)
+                      <input
+                        inputMode="decimal"
+                        value={tirePaymentForm.amount_usd}
+                        onChange={(e) => setTirePaymentForm({ ...tirePaymentForm, amount_usd: e.target.value, customer_id: focusedTireCustomerId })}
+                        placeholder="0.00"
+                      />
+                    </label>
+                    <label>
+                      بڕی وەرگیراو بە دینار (IQD)
+                      <input
+                        inputMode="numeric"
+                        value={tirePaymentForm.amount_iqd}
+                        onChange={(e) => setTirePaymentForm({ ...tirePaymentForm, amount_iqd: e.target.value, customer_id: focusedTireCustomerId })}
+                        placeholder="0"
+                      />
+                    </label>
+                    <label className="span2">
+                      تێبینی
+                      <input
+                        value={tirePaymentForm.note}
+                        onChange={(e) => setTirePaymentForm({ ...tirePaymentForm, note: e.target.value })}
+                        placeholder="بۆ نموونە: قەبزی ژمارە 10"
+                      />
+                    </label>
+                    <button type="submit" className="primary span2" style={{ justifySelf: "stretch" }}>
+                      تۆمارکردنی پارەی وەرگیراو
+                    </button>
+                  </form>
+                </section>
+
+                {/* مێژووی پارە دانەوەکان */}
+                <section className="card">
+                  <h3>مێژووی وەرگرتنەوەکان</h3>
+                  <div className="table-wrap">
+                    <table className="data compact">
+                      <thead>
+                        <tr>
+                          <th>ڕێکەوت</th>
+                          <th>وەرگیراو</th>
+                          <th>تێبینی</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tirePayments
+                          .filter((p) => String(p.customer_id) === String(focusedTireCustomerId))
+                          .map((p) => (
+                            <tr key={p.id}>
+                              <td>{p.payment_date}</td>
+                              <td className="num" style={{ color: "var(--ok)", fontWeight: "600" }}>
+                                {p.amount_usd ? fmtMoney(p.amount_usd, "usd") : ""}
+                                {p.amount_usd && p.amount_iqd ? " + " : ""}
+                                {p.amount_iqd ? fmtMoney(p.amount_iqd, "iqd") : ""}
+                              </td>
+                              <td className="muted">{p.note}</td>
+                              <td>
+                                <button type="button" className="danger link" onClick={() => deleteTirePayment(p.id)}>
+                                  سڕینەوە
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        {tirePayments.filter((p) => String(p.customer_id) === String(focusedTireCustomerId)).length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="muted" style={{ textAlign: "center", padding: "1rem" }}>
+                              هیچ پارەیەکی وەرگیراو نییە.
+                            </td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: ڕاپۆرتی تایە (Tire Reports) ═══════ */}
+      {tab === "tire_reports" ? (
+        <div className="tab-panels">
+          <section className="card">
+            <div className="section-head">
+              <h2>ڕاپۆرت و ئامارەکانی بەشی تایە</h2>
+              <div className="filter-row">
+                <label className="filter-label">
+                  لە
+                  <input type="date" value={tireReportFrom} onChange={(e) => setTireReportFrom(e.target.value)} />
+                </label>
+                <label className="filter-label">
+                  بۆ
+                  <input type="date" value={tireReportTo} onChange={(e) => setTireReportTo(e.target.value)} />
+                </label>
+                <button type="button" className="ghost" onClick={loadTireReport}>
+                  نوێکردنەوە
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {tireReportLoading ? (
+            <section className="card">
+              <div className="banner">بارکردنی ڕاپۆرت…</div>
+            </section>
+          ) : tireReport ? (
+            <>
+              {/* کارتە سەرەکییەکان */}
+              <div className="report-cards">
+                <div className="rpt-card rpt-pay">
+                  <span className="rpt-label">کۆی فرۆشی تایەکان</span>
+                  <strong>{fmtMoney(tireReport.total_sales_usd, "usd")}</strong>
+                  <span className="rpt-sub">{fmtMoney(tireReport.total_sales_iqd, "iqd")}</span>
+                </div>
+                <div className="rpt-card rpt-remain">
+                  <span className="rpt-label">پارەی نەختینە (دراو)</span>
+                  <strong>{fmtMoney(tireReport.total_cash_usd, "usd")}</strong>
+                  <span className="rpt-sub">{fmtMoney(tireReport.total_cash_iqd, "iqd")}</span>
+                </div>
+                <div className="rpt-card rpt-debt">
+                  <span className="rpt-label">ماوەی قەرز (لای کڕیاران)</span>
+                  <strong>{fmtMoney(tireReport.outstanding_debt_usd, "usd")}</strong>
+                  <span className="rpt-sub">{fmtMoney(tireReport.outstanding_debt_iqd, "iqd")}</span>
+                </div>
+                <div className="rpt-card rpt-expense">
+                  <span className="rpt-label">کۆی بەهای مخزن بە نرخی کڕین</span>
+                  <strong>{fmtMoney(tireReport.stock_value_purchase_usd, "usd")}</strong>
+                  <span className="rpt-sub">بەهای فرۆشتن: {fmtMoney(tireReport.stock_value_sale_usd, "usd")}</span>
+                </div>
+              </div>
+
+              {/* پڕفرۆشترین تایەکان */}
+              <section className="card" aria-labelledby="rpt-pop-tires">
+                <h2 id="rpt-pop-tires">پڕفرۆشترین تایەکان (بەپێی ژمارەی فرۆشراو)</h2>
+                {tireReport.popular_tires.length > 0 ? (
+                  <div className="table-wrap">
+                    <table className="data compact">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>جۆری تایە</th>
+                          <th>ژمارەی فرۆشراو</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tireReport.popular_tires.map((t, idx) => (
+                          <tr key={idx}>
+                            <td className="muted">{idx + 1}</td>
+                            <td><strong>{t.name}</strong></td>
+                            <td className="num" style={{ color: "var(--ok)", fontWeight: "600" }}>{t.sold_qty} دانە</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="muted" style={{ textAlign: "center" }}>هیچ فرۆشتنێک تۆمار نەکراوە لەم بەروارەدا.</p>
                 )}
               </section>
             </>

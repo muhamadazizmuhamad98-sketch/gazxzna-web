@@ -99,6 +99,14 @@ button:focus-visible {
   background: rgba(59, 130, 246, 0.08);
 }
 
+.nav-separator {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+  align-self: center;
+  margin: 0 0.5rem;
+}
+
 /* ─── کارتەکان ─── */
 .card {
   background: var(--card);
@@ -869,6 +877,9 @@ button.danger.link:hover {
 @media (max-width: 768px) {
   .tabs {
     gap: 0.3rem;
+  }
+  .nav-separator {
+    display: none;
   }
   .tabs button {
     padding: 0.4rem 0.7rem;
