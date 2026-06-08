@@ -696,10 +696,13 @@ app.get("/api/tire-reports/summary", (req, res) => {
   if (to) { profitSql += " AND s.sale_date <= ?"; profitParams.push(to); }
   const profit = db.prepare(profitSql).get(...profitParams);
   
+  const totalInitialBalance = db.prepare("SELECT SUM(initial_balance_usd) AS initial_usd FROM tire_customers").get();
+  const initialUsd = totalInitialBalance.initial_usd || 0;
+
   const totalOwedSales = db.prepare("SELECT SUM(total_usd - paid_usd) AS owed_usd, SUM(total_iqd - paid_iqd) AS owed_iqd FROM tire_sales").get();
   const totalPayments = db.prepare("SELECT SUM(amount_usd) AS paid_usd, SUM(amount_iqd) AS paid_iqd FROM tire_payments").get();
   
-  const outstandingDebtUsd = (totalOwedSales.owed_usd || 0) - (totalPayments.paid_usd || 0);
+  const outstandingDebtUsd = initialUsd + (totalOwedSales.owed_usd || 0) - (totalPayments.paid_usd || 0);
   const outstandingDebtIqd = (totalOwedSales.owed_iqd || 0) - (totalPayments.paid_iqd || 0);
   
   res.json({
