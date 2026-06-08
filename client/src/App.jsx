@@ -196,6 +196,8 @@ export default function App() {
   const [tireCustomerSearch, setTireCustomerSearch] = useState("");
   
   const [tireSales, setTireSales] = useState([]);
+  const [tireSaleSearch, setTireSaleSearch] = useState("");
+  const [tireSaleFilterType, setTireSaleFilterType] = useState("all");
   const [cart, setCart] = useState([]);
   const [cartForm, setCartForm] = useState({ tire_id: "", quantity: "1", price_usd: "" });
   const [saleForm, setSaleForm] = useState({
@@ -971,6 +973,26 @@ export default function App() {
         String(c.note || "").toLowerCase().includes(q)
     );
   }, [tireCustomers, tireCustomerSearch]);
+
+  const filteredTireSales = useMemo(() => {
+    return tireSales.filter((s) => {
+      // 1. Payment type filter
+      if (tireSaleFilterType !== "all" && s.payment_type !== tireSaleFilterType) {
+        return false;
+      }
+      // 2. Text search filter
+      const q = tireSaleSearch.trim().toLowerCase();
+      if (!q) return true;
+      
+      const matchCustomer = String(s.customer_name || "نەقد (کاش)").toLowerCase().includes(q);
+      const matchNote = String(s.note || "").toLowerCase().includes(q);
+      const matchTires = (s.items || []).some(item => 
+        String(item.tire_name || "").toLowerCase().includes(q)
+      );
+      
+      return matchCustomer || matchNote || matchTires;
+    });
+  }, [tireSales, tireSaleSearch, tireSaleFilterType]);
 
   const tireCustomersTotals = useMemo(() => {
     let usd = 0;
@@ -2056,7 +2078,26 @@ export default function App() {
 
           {/* دوایین فرۆشتنەکان */}
           <section className="card" aria-labelledby="tire-sales-history">
-            <h2 id="tire-sales-history">تۆماری فرۆشتنی تایەکان</h2>
+            <div className="section-head">
+              <h2 id="tire-sales-history">تۆماری فرۆشتنی تایەکان</h2>
+              <div className="filter-row" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <input
+                  value={tireSaleSearch}
+                  onChange={(e) => setTireSaleSearch(e.target.value)}
+                  placeholder="گەڕان بەپێی کڕیار، تایە، تێبینی…"
+                  style={{ width: "240px", minHeight: "2.2rem" }}
+                />
+                <select
+                  value={tireSaleFilterType}
+                  onChange={(e) => setTireSaleFilterType(e.target.value)}
+                  style={{ width: "150px", minHeight: "2.2rem" }}
+                >
+                  <option value="all">هەموو جۆرەکان</option>
+                  <option value="نەقد">نەقد (کاش)</option>
+                  <option value="قەرز">قەرز</option>
+                </select>
+              </div>
+            </div>
             <div className="table-wrap">
               <table className="data">
                 <thead>
@@ -2071,7 +2112,7 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tireSales.map((s) => (
+                  {filteredTireSales.map((s) => (
                     <tr key={s.id}>
                       <td>{s.sale_date}</td>
                       <td>
@@ -2108,10 +2149,10 @@ export default function App() {
                       </td>
                     </tr>
                   ))}
-                  {tireSales.length === 0 ? (
+                  {filteredTireSales.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
-                        هیچ فرۆشتنێک تۆمار نەکراوە.
+                        هیچ فرۆشتنێک نەدۆزرایەوە.
                       </td>
                     </tr>
                   ) : null}
