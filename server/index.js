@@ -683,18 +683,89 @@ app.get("/api/tire-reports/summary", (req, res) => {
     FROM tires_inventory
   `).get();
   
-  let profitSql = `
-    SELECT 
-      COALESCE(SUM(i.quantity * (i.price_usd - t.purchase_price_usd)), 0) AS total_profit_usd
-    FROM tire_sale_items i
-    JOIN tires_inventory t ON t.id = i.tire_id
-    JOIN tire_sales s ON s.id = i.sale_id
-    WHERE 1=1
+  // 1. Profit from Cash Sales (نەقد)
+  let cashSalesSql = `
+    SELECT s.id, s.total_usd
+    FROM tire_sales s
+    WHERE s.payment_type = 'نەقد'
   `;
-  const profitParams = [];
-  if (from) { profitSql += " AND s.sale_date >= ?"; profitParams.push(from); }
-  if (to) { profitSql += " AND s.sale_date <= ?"; profitParams.push(to); }
-  const profit = db.prepare(profitSql).get(...profitParams);
+  const cashSalesParams = [];
+  if (from) { cashSalesSql += " AND s.sale_date >= ?"; cashSalesParams.push(from); }
+  if (to) { cashSalesSql += " AND s.sale_date <= ?"; cashSalesParams.push(to); }
+  const cashSales = db.prepare(cashSalesSql).all(...cashSalesParams);
+  
+  let totalCashSalesProfit = 0;
+  cashSales.forEach(sale => {
+    const costRow = db.prepare(`
+      SELECT SUM(i.quantity * t.purchase_price_usd) AS cost
+      FROM tire_sale_items i
+      JOIN tires_inventory t ON t.id = i.tire_id
+      WHERE i.sale_id = ?
+    `).get(sale.id);
+    const cost = costRow.cost || 0;
+    totalCashSalesProfit += (sale.total_usd - cost);
+  });
+
+  // 2. Profit from Credit Sales (قەرز) Upfront Payments
+  let creditSalesSql = `
+    SELECT s.id, s.total_usd, s.paid_usd
+    FROM tire_sales s
+    WHERE s.payment_type = 'قەرز' AND s.paid_usd > 0
+  `;
+  const creditSalesParams = [];
+  if (from) { creditSalesSql += " AND s.sale_date >= ?"; creditSalesParams.push(from); }
+  if (to) { creditSalesSql += " AND s.sale_date <= ?"; creditSalesParams.push(to); }
+  const creditSales = db.prepare(creditSalesSql).all(...creditSalesParams);
+  
+  let totalCreditUpfrontProfit = 0;
+  creditSales.forEach(sale => {
+    const costRow = db.prepare(`
+      SELECT SUM(i.quantity * t.purchase_price_usd) AS cost
+      FROM tire_sale_items i
+      JOIN tires_inventory t ON t.id = i.tire_id
+      WHERE i.sale_id = ?
+    `).get(sale.id);
+    const cost = costRow.cost || 0;
+    const saleProfit = sale.total_usd - cost;
+    const margin = sale.total_usd > 0 ? (saleProfit / sale.total_usd) : 0;
+    totalCreditUpfrontProfit += (sale.paid_usd * margin);
+  });
+
+  // 3. Profit from Later Payments (from Debtors payments)
+  let laterPaymentsSql = `
+    SELECT p.customer_id, p.amount_usd
+    FROM tire_payments p
+    WHERE p.amount_usd > 0
+  `;
+  const laterPaymentsParams = [];
+  if (from) { laterPaymentsSql += " AND p.payment_date >= ?"; laterPaymentsParams.push(from); }
+  if (to) { laterPaymentsSql += " AND p.payment_date <= ?"; laterPaymentsParams.push(to); }
+  const laterPayments = db.prepare(laterPaymentsSql).all(...laterPaymentsParams);
+  
+  let totalLaterPaymentsProfit = 0;
+  const customerMargins = {};
+  laterPayments.forEach(pay => {
+    const cid = pay.customer_id;
+    if (customerMargins[cid] === undefined) {
+      const totalSales = db.prepare("SELECT SUM(total_usd) AS total FROM tire_sales WHERE customer_id = ?").get(cid).total || 0;
+      let totalCost = 0;
+      if (totalSales > 0) {
+        const costRow = db.prepare(`
+          SELECT SUM(i.quantity * t.purchase_price_usd) AS cost
+          FROM tire_sale_items i
+          JOIN tires_inventory t ON t.id = i.tire_id
+          JOIN tire_sales s ON s.id = i.sale_id
+          WHERE s.customer_id = ?
+        `).get(cid);
+        totalCost = costRow.cost || 0;
+      }
+      const profit = totalSales - totalCost;
+      customerMargins[cid] = totalSales > 0 ? (profit / totalSales) : 0;
+    }
+    totalLaterPaymentsProfit += (pay.amount_usd * customerMargins[cid]);
+  });
+
+  const totalProfitUsd = totalCashSalesProfit + totalCreditUpfrontProfit + totalLaterPaymentsProfit;
   
   const totalInitialBalance = db.prepare("SELECT SUM(initial_balance_usd) AS initial_usd FROM tire_customers").get();
   const initialUsd = totalInitialBalance.initial_usd || 0;
@@ -716,7 +787,7 @@ app.get("/api/tire-reports/summary", (req, res) => {
     stock_value_sale_usd: stock.stock_value_sale_usd || 0,
     total_tires_count: stock.total_tires_count || 0,
     popular_tires: popularTires,
-    total_profit_usd: profit.total_profit_usd || 0
+    total_profit_usd: totalProfitUsd
   });
 });
 
