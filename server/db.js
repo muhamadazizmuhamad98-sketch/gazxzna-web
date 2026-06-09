@@ -27,8 +27,9 @@ db.exec(`
     debt_usd REAL NOT NULL DEFAULT 0,
     payment_usd REAL NOT NULL DEFAULT 0,
     debt_iqd REAL NOT NULL DEFAULT 0,
-    payment_iqd REAL NOT NULL DEFAULT 0,
     note TEXT DEFAULT '',
+    profit_usd REAL NOT NULL DEFAULT 0,
+    profit_iqd REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -118,4 +119,22 @@ try {
   /* ستوون پێشتر هەیە — هیچ ناکرێت */
 }
 
+// Safe migration for existing databases
+try {
+  const columns = db.prepare("PRAGMA table_info(transactions)").all();
+  const hasProfitUsd = columns.some((c) => c.name === "profit_usd");
+  if (!hasProfitUsd) {
+    db.exec("ALTER TABLE transactions ADD COLUMN profit_usd REAL NOT NULL DEFAULT 0");
+    console.log("Added profit_usd column to transactions table successfully.");
+  }
+  const hasProfitIqd = columns.some((c) => c.name === "profit_iqd");
+  if (!hasProfitIqd) {
+    db.exec("ALTER TABLE transactions ADD COLUMN profit_iqd REAL NOT NULL DEFAULT 0");
+    console.log("Added profit_iqd column to transactions table successfully.");
+  }
+} catch (err) {
+  console.error("Failed to run transactions migration:", err);
+}
+
 module.exports = { db };
+

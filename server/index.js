@@ -204,6 +204,8 @@ app.post("/api/transactions", (req, res) => {
   const debt_iqd = Number(req.body?.debt_iqd) || 0;
   const payment_iqd = Number(req.body?.payment_iqd) || 0;
   const note = String(req.body?.note ?? "").trim();
+  const profit_usd = Number(req.body?.profit_usd) || 0;
+  const profit_iqd = Number(req.body?.profit_iqd) || 0;
   if (!debtor_id || Number.isNaN(debtor_id)) {
     return res.status(400).json({ error: "قەرزدار هەڵبژێرە" });
   }
@@ -213,10 +215,10 @@ app.post("/api/transactions", (req, res) => {
   const info = db
     .prepare(
       `INSERT INTO transactions
-      (debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, payment_iqd, note)
-      VALUES (?,?,?,?,?,?,?,?,?)`
+      (debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, payment_iqd, note, profit_usd, profit_iqd)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`
     )
-    .run(debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, payment_iqd, note);
+    .run(debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, payment_iqd, note, profit_usd, profit_iqd);
   const row = db
     .prepare(
       `SELECT t.*, d.name AS debtor_name FROM transactions t
@@ -307,7 +309,9 @@ app.get("/api/reports/summary", (req, res) => {
     COALESCE(SUM(debt_usd),0)    AS total_debt_usd,
     COALESCE(SUM(debt_iqd),0)    AS total_debt_iqd,
     COALESCE(SUM(payment_usd),0) AS total_payment_usd,
-    COALESCE(SUM(payment_iqd),0) AS total_payment_iqd
+    COALESCE(SUM(payment_iqd),0) AS total_payment_iqd,
+    COALESCE(SUM(profit_usd),0)  AS total_profit_usd,
+    COALESCE(SUM(profit_iqd),0)  AS total_profit_iqd
    FROM transactions WHERE 1=1`;
   const txnParams = [];
   if (from) { txnSql += " AND txn_date >= ?"; txnParams.push(from); }
@@ -353,6 +357,8 @@ app.get("/api/reports/summary", (req, res) => {
     total_debt_iqd: txn.total_debt_iqd,
     total_payment_usd: txn.total_payment_usd,
     total_payment_iqd: txn.total_payment_iqd,
+    total_profit_usd: txn.total_profit_usd,
+    total_profit_iqd: txn.total_profit_iqd,
     remaining_usd: txn.total_debt_usd - txn.total_payment_usd,
     remaining_iqd: txn.total_debt_iqd - txn.total_payment_iqd,
     total_expense_usd: exp.total_expense_usd,

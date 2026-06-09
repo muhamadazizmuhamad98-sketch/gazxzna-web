@@ -42,6 +42,18 @@ function getFieldMask(txnType, currencyKind) {
   return { debt_usd: true, payment_usd: true, debt_iqd: true, payment_iqd: true };
 }
 
+/** دیاریکردنی خانەی قازانج لەسەر بنەمای دراو */
+function getProfitFieldMask(currencyKind) {
+  const ck = String(currencyKind);
+  const dollar = ck.includes("دۆلار") && !ck.includes("هەردوو");
+  const dinar = ck.includes("دینار") && !ck.includes("هەردوو");
+  const both = ck.includes("هەردوو");
+  return {
+    profit_usd: dollar || both,
+    profit_iqd: dinar || both,
+  };
+}
+
 function num(v) {
   const n = parseFloat(String(v).replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
@@ -163,6 +175,8 @@ export default function App() {
     debt_iqd: "",
     payment_iqd: "",
     note: "",
+    profit_usd: "",
+    profit_iqd: "",
   });
 
   /* ─── مسروفات state ─── */
@@ -543,6 +557,7 @@ export default function App() {
       return;
     }
     const m = getFieldMask(txnForm.txn_type, txnForm.currency_kind);
+    const pMask = getProfitFieldMask(txnForm.currency_kind);
     const body = {
       debtor_id: Number(selectedId),
       txn_date: txnForm.txn_date,
@@ -553,6 +568,8 @@ export default function App() {
       debt_iqd: m.debt_iqd ? num(txnForm.debt_iqd) : 0,
       payment_iqd: m.payment_iqd ? num(txnForm.payment_iqd) : 0,
       note: txnForm.note.trim(),
+      profit_usd: pMask.profit_usd ? num(txnForm.profit_usd) : 0,
+      profit_iqd: pMask.profit_iqd ? num(txnForm.profit_iqd) : 0,
     };
     const r = await fetch(`${API}/transactions`, {
       method: "POST",
@@ -571,6 +588,8 @@ export default function App() {
       debt_iqd: "",
       payment_iqd: "",
       note: "",
+      profit_usd: "",
+      profit_iqd: "",
     }));
     await refreshTxns();
     if (debtorsFocusId && String(debtorsFocusId) === String(selectedId)) {
@@ -927,6 +946,11 @@ export default function App() {
     [txnForm.txn_type, txnForm.currency_kind]
   );
 
+  const profitMask = useMemo(
+    () => getProfitFieldMask(txnForm.currency_kind),
+    [txnForm.currency_kind]
+  );
+
   const expenseTotals = useMemo(() => {
     let usd = 0, iqd = 0;
     expenses.forEach((e) => { usd += e.amount_usd || 0; iqd += e.amount_iqd || 0; });
@@ -1014,10 +1038,13 @@ export default function App() {
     setTxnForm((prev) => {
       const next = { ...prev, ...updates };
       const mask = getFieldMask(next.txn_type, next.currency_kind);
+      const pMask = getProfitFieldMask(next.currency_kind);
       if (!mask.debt_usd) next.debt_usd = "";
       if (!mask.payment_usd) next.payment_usd = "";
       if (!mask.debt_iqd) next.debt_iqd = "";
       if (!mask.payment_iqd) next.payment_iqd = "";
+      if (!pMask.profit_usd) next.profit_usd = "";
+      if (!pMask.profit_iqd) next.profit_iqd = "";
       return next;
     });
   }
@@ -1383,7 +1410,29 @@ export default function App() {
                   />
                 </label>
               </div>
-              <div className="txn-note-row">
+              <div className="amount-row" style={{ marginTop: "0.5rem" }}>
+                <label className={`cell-sm pay${profitMask.profit_usd ? "" : " off"}`} style={{ gridColumn: "span 2" }}>
+                  قازانج ($)
+                  <input
+                    inputMode="decimal"
+                    value={txnForm.profit_usd}
+                    disabled={!profitMask.profit_usd}
+                    onChange={(e) => setTxnForm({ ...txnForm, profit_usd: e.target.value })}
+                    placeholder="0"
+                  />
+                </label>
+                <label className={`cell-sm pay${profitMask.profit_iqd ? "" : " off"}`} style={{ gridColumn: "span 2" }}>
+                  قازانج (د.ع)
+                  <input
+                    inputMode="numeric"
+                    value={txnForm.profit_iqd}
+                    disabled={!profitMask.profit_iqd}
+                    onChange={(e) => setTxnForm({ ...txnForm, profit_iqd: e.target.value })}
+                    placeholder="0"
+                  />
+                </label>
+              </div>
+              <div className="txn-note-row" style={{ marginTop: "0.5rem" }}>
                 <label className="txn-note-label">
                   تێبینی (ئیختیاری — بۆ نموونە: کێ پارەی دایە)
                   <input
@@ -1409,6 +1458,7 @@ export default function App() {
                     <th>پارە $</th>
                     <th>قەرز د.ع</th>
                     <th>واسڵ د.ع</th>
+                    <th>قازانج</th>
                     <th>تێبینی</th>
                     <th></th>
                   </tr>
@@ -1423,6 +1473,12 @@ export default function App() {
                       <td className="num pay">{t.payment_usd ? fmtMoney(t.payment_usd, "usd") : "—"}</td>
                       <td className="num debt">{t.debt_iqd ? fmtMoney(t.debt_iqd, "iqd") : "—"}</td>
                       <td className="num pay">{t.payment_iqd ? fmtMoney(t.payment_iqd, "iqd") : "—"}</td>
+                      <td className="num" style={{ color: "var(--ok)", fontWeight: "600" }}>
+                        {t.profit_usd ? fmtMoney(t.profit_usd, "usd") : ""}
+                        {t.profit_usd && t.profit_iqd ? " / " : ""}
+                        {t.profit_iqd ? fmtMoney(t.profit_iqd, "iqd") : ""}
+                        {!t.profit_usd && !t.profit_iqd ? "—" : ""}
+                      </td>
                       <td className="muted txn-note-cell">{t.note || ""}</td>
                       <td>
                         <button type="button" className="danger link" onClick={() => deleteTxn(t.id)}>
@@ -1433,6 +1489,47 @@ export default function App() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="mobile-only txn-cards">
+              {transactions.map((t) => (
+                <div key={t.id} className="txn-card-item">
+                  <div className="txn-card-header">
+                    <span className="txn-card-name">{t.debtor_name}</span>
+                    <span className="txn-card-date num">{t.txn_date}</span>
+                  </div>
+                  <div className="txn-card-body">
+                    <span className="txn-card-type muted">{t.txn_type}</span>
+                    <div className="txn-card-amounts">
+                      {t.debt_usd ? <div className="amount-val num debt">قەرز: {fmtMoney(t.debt_usd, "usd")}</div> : null}
+                      {t.payment_usd ? <div className="amount-val num pay">واسڵ: {fmtMoney(t.payment_usd, "usd")}</div> : null}
+                      {t.debt_iqd ? <div className="amount-val num debt">قەرز: {fmtMoney(t.debt_iqd, "iqd")}</div> : null}
+                      {t.payment_iqd ? <div className="amount-val num pay">واسڵ: {fmtMoney(t.payment_iqd, "iqd")}</div> : null}
+                    </div>
+                    {(t.profit_usd || t.profit_iqd) ? (
+                      <div className="txn-card-amounts" style={{ marginTop: "0.25rem", borderTop: "1px dashed var(--border)", paddingTop: "0.25rem" }}>
+                        <div className="amount-val num pay" style={{ fontWeight: "600" }}>
+                          قازانج: {t.profit_usd ? fmtMoney(t.profit_usd, "usd") : ""} {t.profit_usd && t.profit_iqd ? " + " : ""} {t.profit_iqd ? fmtMoney(t.profit_iqd, "iqd") : ""}
+                        </div>
+                      </div>
+                    ) : null}
+                    {t.note ? (
+                      <div className="muted" style={{ fontSize: "0.8rem", marginTop: "0.25rem" }}>
+                        تێبینی: {t.note}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="txn-card-actions">
+                    <button type="button" className="danger link" onClick={() => deleteTxn(t.id)}>
+                      سڕینەوە
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {transactions.length === 0 ? (
+                <div className="muted" style={{ textAlign: "center", padding: "2rem" }}>
+                  هیچ مامەڵەیەک تۆمار نەکراوە.
+                </div>
+              ) : null}
             </div>
           </section>
         </div>
@@ -1619,6 +1716,20 @@ export default function App() {
                   <span className="rpt-label">کۆی مسروفات</span>
                   <strong>{fmtMoney(report.total_expense_usd, "usd")}</strong>
                   <span className="rpt-sub">{fmtMoney(report.total_expense_iqd, "iqd")}</span>
+                </div>
+                <div className="rpt-card rpt-pay" style={{ borderRight: "3px solid var(--ok)" }}>
+                  <span className="rpt-label" style={{ color: "var(--ok)" }}>کۆی قازانج</span>
+                  <strong style={{ color: "var(--ok)" }}>{fmtMoney(report.total_profit_usd, "usd")}</strong>
+                  <span className="rpt-sub">{fmtMoney(report.total_profit_iqd, "iqd")}</span>
+                </div>
+                <div className="rpt-card rpt-remain" style={{ borderRight: "3px solid #06b6d4" }}>
+                  <span className="rpt-label" style={{ color: "#06b6d4" }}>قازانجی سافی</span>
+                  <strong style={{ color: (report.total_profit_usd - report.total_expense_usd) >= 0 ? "var(--ok)" : "var(--owe)" }}>
+                    {fmtMoney(report.total_profit_usd - report.total_expense_usd, "usd")}
+                  </strong>
+                  <span className="rpt-sub" style={{ color: (report.total_profit_iqd - report.total_expense_iqd) >= 0 ? "var(--ok)" : "var(--owe)" }}>
+                    {fmtMoney(report.total_profit_iqd - report.total_expense_iqd, "iqd")}
+                  </span>
                 </div>
               </div>
 
