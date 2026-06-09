@@ -689,19 +689,19 @@ app.get("/api/tire-reports/summary", (req, res) => {
     FROM tires_inventory
   `).get();
   
-  // 1. Profit from Cash Sales (نەقد)
-  let cashSalesSql = `
+  // Calculate Profit from All Sales (both Cash and Credit)
+  let tireSalesSql = `
     SELECT s.id, s.total_usd
     FROM tire_sales s
-    WHERE s.payment_type = 'نەقد'
+    WHERE 1=1
   `;
-  const cashSalesParams = [];
-  if (from) { cashSalesSql += " AND s.sale_date >= ?"; cashSalesParams.push(from); }
-  if (to) { cashSalesSql += " AND s.sale_date <= ?"; cashSalesParams.push(to); }
-  const cashSales = db.prepare(cashSalesSql).all(...cashSalesParams);
+  const tireSalesParams = [];
+  if (from) { tireSalesSql += " AND s.sale_date >= ?"; tireSalesParams.push(from); }
+  if (to) { tireSalesSql += " AND s.sale_date <= ?"; tireSalesParams.push(to); }
+  const tireSales = db.prepare(tireSalesSql).all(...tireSalesParams);
   
-  let totalCashSalesProfit = 0;
-  cashSales.forEach(sale => {
+  let totalProfitUsd = 0;
+  tireSales.forEach(sale => {
     const costRow = db.prepare(`
       SELECT SUM(i.quantity * t.purchase_price_usd) AS cost
       FROM tire_sale_items i
@@ -709,69 +709,8 @@ app.get("/api/tire-reports/summary", (req, res) => {
       WHERE i.sale_id = ?
     `).get(sale.id);
     const cost = costRow.cost || 0;
-    totalCashSalesProfit += (sale.total_usd - cost);
+    totalProfitUsd += (sale.total_usd - cost);
   });
-
-  // 2. Profit from Credit Sales (قەرز) Upfront Payments
-  let creditSalesSql = `
-    SELECT s.id, s.total_usd, s.paid_usd
-    FROM tire_sales s
-    WHERE s.payment_type = 'قەرز' AND s.paid_usd > 0
-  `;
-  const creditSalesParams = [];
-  if (from) { creditSalesSql += " AND s.sale_date >= ?"; creditSalesParams.push(from); }
-  if (to) { creditSalesSql += " AND s.sale_date <= ?"; creditSalesParams.push(to); }
-  const creditSales = db.prepare(creditSalesSql).all(...creditSalesParams);
-  
-  let totalCreditUpfrontProfit = 0;
-  creditSales.forEach(sale => {
-    const costRow = db.prepare(`
-      SELECT SUM(i.quantity * t.purchase_price_usd) AS cost
-      FROM tire_sale_items i
-      JOIN tires_inventory t ON t.id = i.tire_id
-      WHERE i.sale_id = ?
-    `).get(sale.id);
-    const cost = costRow.cost || 0;
-    const saleProfit = sale.total_usd - cost;
-    const margin = sale.total_usd > 0 ? (saleProfit / sale.total_usd) : 0;
-    totalCreditUpfrontProfit += (sale.paid_usd * margin);
-  });
-
-  // 3. Profit from Later Payments (from Debtors payments)
-  let laterPaymentsSql = `
-    SELECT p.customer_id, p.amount_usd
-    FROM tire_payments p
-    WHERE p.amount_usd > 0
-  `;
-  const laterPaymentsParams = [];
-  if (from) { laterPaymentsSql += " AND p.payment_date >= ?"; laterPaymentsParams.push(from); }
-  if (to) { laterPaymentsSql += " AND p.payment_date <= ?"; laterPaymentsParams.push(to); }
-  const laterPayments = db.prepare(laterPaymentsSql).all(...laterPaymentsParams);
-  
-  let totalLaterPaymentsProfit = 0;
-  const customerMargins = {};
-  laterPayments.forEach(pay => {
-    const cid = pay.customer_id;
-    if (customerMargins[cid] === undefined) {
-      const totalSales = db.prepare("SELECT SUM(total_usd) AS total FROM tire_sales WHERE customer_id = ?").get(cid).total || 0;
-      let totalCost = 0;
-      if (totalSales > 0) {
-        const costRow = db.prepare(`
-          SELECT SUM(i.quantity * t.purchase_price_usd) AS cost
-          FROM tire_sale_items i
-          JOIN tires_inventory t ON t.id = i.tire_id
-          JOIN tire_sales s ON s.id = i.sale_id
-          WHERE s.customer_id = ?
-        `).get(cid);
-        totalCost = costRow.cost || 0;
-      }
-      const profit = totalSales - totalCost;
-      customerMargins[cid] = totalSales > 0 ? (profit / totalSales) : 0;
-    }
-    totalLaterPaymentsProfit += (pay.amount_usd * customerMargins[cid]);
-  });
-
-  const totalProfitUsd = totalCashSalesProfit + totalCreditUpfrontProfit + totalLaterPaymentsProfit;
   
   const totalInitialBalance = db.prepare("SELECT SUM(initial_balance_usd) AS initial_usd FROM tire_customers").get();
   const initialUsd = totalInitialBalance.initial_usd || 0;
