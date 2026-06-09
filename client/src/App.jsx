@@ -1061,7 +1061,6 @@ export default function App() {
     <div className="app">
       <header className="top">
         <h1>گازخانە — بەڕێوەبردنی قەرز و مامەڵە</h1>
-        <p className="sub">تابی قەرزداران بۆ تۆمار و کورتە؛ مامەڵەی ڕۆژانە بۆ قەرز و واسڵ؛ مسروفات بۆ خەرجی؛ ڕاپۆرت بۆ ئامار.</p>
         <nav className="tabs">
           <button type="button" className={tab === "daily" ? "on" : ""} onClick={() => switchTab("daily")}>
             <IconDaily /> مامەڵەی ڕۆژانە
