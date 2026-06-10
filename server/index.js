@@ -174,7 +174,7 @@ function adminOrTire(req, res, next) {
 
 function adminOrUser(req, res, next) {
   if (!req.user || (req.user.role !== "admin" && req.user.role !== "user")) {
-    return res.status(403).json({ error: "تەنها ئادمین یان بەکارهێنەری مامەڵەکان دەستگەیشتن بەم بەشە هەیە" });
+    return res.status(403).json({ error: "" });
   }
   next();
 }
