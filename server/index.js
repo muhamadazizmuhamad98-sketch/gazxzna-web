@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
+const jwt = require("jsonwebtoken");
 const { db } = require("./db");
 
 function loadRootEnv() {
@@ -25,12 +26,163 @@ loadRootEnv();
 
 const app = express();
 const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
+const JWT_SECRET = process.env.JWT_SECRET || "gazxana-secret-key-fallback";
+
+/* ─── بەکارهێنەرانی سیستەم (مێرجکردنی .env لەگەڵ داتابەیس) ─── */
+function getAllUsers() {
+  const systemUsers = [
+    {
+      username: (process.env.ADMIN_USER || "admin").trim().toLowerCase(),
+      password: process.env.ADMIN_PASS || "admin123",
+      role: "admin",
+      displayName: "ئادمین (سەرەکی)",
+      isSystem: true
+    },
+    {
+      username: (process.env.USER_USER || "user").trim().toLowerCase(),
+      password: process.env.USER_PASS || "user123",
+      role: "user",
+      displayName: "بەکارهێنەر (مامەڵەکان - سەرەکی)",
+      isSystem: true
+    },
+    {
+      username: (process.env.TIRE_USER || "tire").trim().toLowerCase(),
+      password: process.env.TIRE_PASS || "tire123",
+      role: "tire",
+      displayName: "بەکارهێنەر (تایە - سەرەکی)",
+      isSystem: true
+    }
+  ];
+
+  try {
+    const dbUsers = db.prepare("SELECT * FROM users").all();
+    const mappedDb = dbUsers.map(u => ({
+      username: u.username.trim().toLowerCase(),
+      password: u.password,
+      role: u.role,
+      displayName: u.display_name,
+      isSystem: false
+    }));
+
+    const merged = [...mappedDb];
+    for (const sys of systemUsers) {
+      if (!merged.some(u => u.username === sys.username)) {
+        merged.push(sys);
+      }
+    }
+    return merged;
+  } catch (err) {
+    console.error("Error loading users from database:", err);
+    return systemUsers;
+  }
+}
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
+/* ═══════ Auth Endpoints ═══════ */
+
+app.post("/api/auth/login", (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: "ناوی بەکارهێنەر و وشەی نهێنی پێویستە" });
+  }
+  const cleanUsername = username.trim().toLowerCase();
+  const allUsers = getAllUsers();
+  const user = allUsers.find(
+    (u) => u.username === cleanUsername && u.password === password
+  );
+  if (!user) {
+    return res.status(401).json({ error: "ناوی بەکارهێنەر یان وشەی نهێنی هەڵەیە" });
+  }
+  const token = jwt.sign(
+    { username: user.username, role: user.role, displayName: user.displayName },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+  res.json({
+    token,
+    user: {
+      username: user.username,
+      role: user.role,
+      displayName: user.displayName,
+    },
+  });
+});
+
+app.get("/api/auth/me", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "چوونەژوورەوە پێویستە" });
+  }
+  try {
+    const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+    res.json({
+      username: decoded.username,
+      role: decoded.role,
+      displayName: decoded.displayName,
+    });
+  } catch {
+    return res.status(401).json({ error: "token بەسەرچووە، دووبارە بچۆرەژوورەوە" });
+  }
+});
+
+/* ═══════ Auth Middleware ═══════ */
+
+function authMiddleware(req, res, next) {
+  // بێ auth بۆ health و login
+  if (req.path === "/api/health" || req.path === "/api/auth/login") {
+    return next();
+  }
+  // ڕێگەدان بە باکئەپی داتابەیس ئەگەر تێپەڕەوشەی باکئەپی ڕاست لەگەڵ بێت
+  if (req.path === "/api/admin/backup-db") {
+    const secretKey = req.query.secret || "";
+    const expectedSecret = process.env.BACKUP_SECRET || "gazxana1234";
+    if (secretKey && secretKey === expectedSecret) {
+      req.user = { role: "admin", username: "backup_agent" };
+      return next();
+    }
+  }
+  // هەموو API-یەکانی تر auth پێویستە
+  if (!req.path.startsWith("/api/")) return next();
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "چوونەژوورەوە پێویستە" });
+  }
+  try {
+    const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ error: "token بەسەرچووە، دووبارە بچۆرەژوورەوە" });
+  }
+}
+
+function adminOnly(req, res, next) {
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(403).json({ error: "تەنها ئادمین دەستگەیشتن بەم بەشە هەیە" });
+  }
+  next();
+}
+
+function adminOrTire(req, res, next) {
+  if (!req.user || (req.user.role !== "admin" && req.user.role !== "tire")) {
+    return res.status(403).json({ error: "تەنها ئادمین یان بەکارهێنەری تایە دەستگەیشتن بەم بەشە هەیە" });
+  }
+  next();
+}
+
+function adminOrUser(req, res, next) {
+  if (!req.user || (req.user.role !== "admin" && req.user.role !== "user")) {
+    return res.status(403).json({ error: "تەنها ئادمین یان بەکارهێنەری مامەڵەکان دەستگەیشتن بەم بەشە هەیە" });
+  }
+  next();
+}
+
+app.use(authMiddleware);
+
 // ─── باکئەپی داتابەیس (Secure SQLite Backup) ───
-app.get("/api/admin/backup-db", (req, res) => {
+app.get("/api/admin/backup-db", adminOnly, (req, res) => {
   const secretKey = req.query.secret || "";
   const expectedSecret = process.env.BACKUP_SECRET || "gazxana1234";
   
@@ -51,7 +203,7 @@ app.get("/api/admin/backup-db", (req, res) => {
 });
 
 // ─── سفرکردنەوەی تەواوی داتابەیس (Secure SQLite Database Reset) ───
-app.post("/api/admin/reset-db", (req, res) => {
+app.post("/api/admin/reset-db", adminOnly, (req, res) => {
   const secretKey = req.body?.secret || "";
   const expectedSecret = process.env.BACKUP_SECRET || "gazxana1234";
   
@@ -77,6 +229,84 @@ app.post("/api/admin/reset-db", (req, res) => {
   } catch (err) {
     console.error("Database reset error:", err);
     res.status(500).json({ error: "سفرکردنەوەی داتابەیس سەرنەکەوت" });
+  }
+});
+
+// ─── بەڕێوەبردنی بەکارهێنەران (تەنها ئادمین) ───
+app.get("/api/admin/users", adminOnly, (req, res) => {
+  const users = getAllUsers().map(u => ({
+    username: u.username,
+    role: u.role,
+    displayName: u.displayName,
+    isSystem: u.isSystem || false
+  }));
+  res.json(users);
+});
+
+app.post("/api/admin/users", adminOnly, (req, res) => {
+  const username = String(req.body?.username ?? "").trim().toLowerCase();
+  const password = String(req.body?.password ?? "");
+  const role = String(req.body?.role ?? "user");
+  const displayName = String(req.body?.displayName ?? "").trim();
+
+  if (!username || !password || !displayName) {
+    return res.status(400).json({ error: "تکایە هەموو خانەکان پڕ بکەرەوە" });
+  }
+
+  if (!["admin", "user", "tire"].includes(role)) {
+    return res.status(400).json({ error: "ڕۆڵی نادروست" });
+  }
+
+  const allUsers = getAllUsers();
+  const exists = allUsers.some(u => u.username === username);
+  if (exists) {
+    return res.status(409).json({ error: "ئەم ناوی بەکارهێنەرە پێشتر هەیە" });
+  }
+
+  try {
+    db.prepare(`
+      INSERT INTO users (username, password, role, display_name)
+      VALUES (?, ?, ?, ?)
+    `).run(username, password, role, displayName);
+
+    res.status(201).json({
+      username,
+      role,
+      displayName,
+      isSystem: false
+    });
+  } catch (err) {
+    console.error("Error creating user:", err);
+    res.status(500).json({ error: "دروستکردنی بەکارهێنەر سەرنەکەوت" });
+  }
+});
+
+app.delete("/api/admin/users/:username", adminOnly, (req, res) => {
+  const username = String(req.params.username).trim().toLowerCase();
+
+  const allUsers = getAllUsers();
+  const target = allUsers.find(u => u.username === username);
+  if (!target) {
+    return res.status(404).json({ error: "بەکارهێنەر نەدۆزرایەوە" });
+  }
+
+  if (target.isSystem) {
+    return res.status(400).json({ error: "ناتوانیت بەکارهێنەرانی سەرەکی سیستم بسڕیتەوە" });
+  }
+
+  if (req.user && req.user.username.toLowerCase() === username) {
+    return res.status(400).json({ error: "ناتوانیت بەکارهێنەری خۆت بسڕیتەوە کاتێک داخڵی" });
+  }
+
+  try {
+    const info = db.prepare("DELETE FROM users WHERE username = ?").run(username);
+    if (info.changes === 0) {
+      return res.status(404).json({ error: "بەکارهێنەر نەدۆزرایەوە" });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    res.status(500).json({ error: "سڕینەوەی بەکارهێنەر سەرنەکەوت" });
   }
 });
 
@@ -107,12 +337,12 @@ function balancesForDebtor(debtorId) {
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-app.get("/api/debtors", (_req, res) => {
+app.get("/api/debtors", adminOrUser, (_req, res) => {
   const rows = db.prepare("SELECT * FROM debtors ORDER BY name COLLATE NOCASE").all();
   res.json(rows.map(rowDebtor));
 });
 
-app.post("/api/debtors", (req, res) => {
+app.post("/api/debtors", adminOrUser, (req, res) => {
   const name = String(req.body?.name ?? "").trim();
   if (!name) return res.status(400).json({ error: "ناو پێویستە" });
   const phone = String(req.body?.phone ?? "").trim();
@@ -131,7 +361,7 @@ app.post("/api/debtors", (req, res) => {
   }
 });
 
-app.patch("/api/debtors/:id", (req, res) => {
+app.patch("/api/debtors/:id", adminOrUser, (req, res) => {
   const id = Number(req.params.id);
   const cur = db.prepare("SELECT * FROM debtors WHERE id = ?").get(id);
   if (!cur) return res.status(404).json({ error: "نەدۆزرایەوە" });
@@ -156,14 +386,14 @@ app.patch("/api/debtors/:id", (req, res) => {
   }
 });
 
-app.delete("/api/debtors/:id", (req, res) => {
+app.delete("/api/debtors/:id", adminOrUser, (req, res) => {
   const id = Number(req.params.id);
   const info = db.prepare("DELETE FROM debtors WHERE id = ?").run(id);
   if (info.changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
   res.json({ ok: true });
 });
 
-app.get("/api/debtors/:id/summary", (req, res) => {
+app.get("/api/debtors/:id/summary", adminOrUser, (req, res) => {
   const id = Number(req.params.id);
   const d = db.prepare("SELECT * FROM debtors WHERE id = ?").get(id);
   if (!d) return res.status(404).json({ error: "نەدۆزرایەوە" });
@@ -171,7 +401,7 @@ app.get("/api/debtors/:id/summary", (req, res) => {
   res.json({ ...rowDebtor(d), ...b });
 });
 
-app.get("/api/transactions", (req, res) => {
+app.get("/api/transactions", adminOrUser, (req, res) => {
   const debtorId = req.query.debtor_id ? Number(req.query.debtor_id) : null;
   const q = req.query.q ? String(req.query.q).trim() : "";
   let sql = `
@@ -194,7 +424,7 @@ app.get("/api/transactions", (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/transactions", (req, res) => {
+app.post("/api/transactions", adminOrUser, (req, res) => {
   const debtor_id = Number(req.body?.debtor_id);
   const txn_date = String(req.body?.txn_date ?? "").trim();
   const currency_kind = String(req.body?.currency_kind ?? "").trim();
@@ -228,7 +458,7 @@ app.post("/api/transactions", (req, res) => {
   res.status(201).json(row);
 });
 
-app.delete("/api/transactions/:id", (req, res) => {
+app.delete("/api/transactions/:id", adminOrUser, (req, res) => {
   const id = Number(req.params.id);
   const info = db.prepare("DELETE FROM transactions WHERE id = ?").run(id);
   if (info.changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
@@ -247,11 +477,11 @@ const EXPENSE_CATEGORIES = [
   "هیتر",
 ];
 
-app.get("/api/expense-categories", (_req, res) => {
+app.get("/api/expense-categories", adminOrUser, (_req, res) => {
   res.json(EXPENSE_CATEGORIES);
 });
 
-app.get("/api/expenses", (req, res) => {
+app.get("/api/expenses", adminOrUser, (req, res) => {
   const from = req.query.from || "";
   const to = req.query.to || "";
   let sql = "SELECT * FROM expenses WHERE 1=1";
@@ -269,7 +499,7 @@ app.get("/api/expenses", (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/expenses", (req, res) => {
+app.post("/api/expenses", adminOrUser, (req, res) => {
   const title = String(req.body?.title ?? "").trim();
   if (!title) return res.status(400).json({ error: "ناونیشان پێویستە" });
   const category = String(req.body?.category ?? "گشتی").trim();
@@ -291,7 +521,7 @@ app.post("/api/expenses", (req, res) => {
   res.status(201).json(row);
 });
 
-app.delete("/api/expenses/:id", (req, res) => {
+app.delete("/api/expenses/:id", adminOrUser, (req, res) => {
   const id = Number(req.params.id);
   const info = db.prepare("DELETE FROM expenses WHERE id = ?").run(id);
   if (info.changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
@@ -300,7 +530,7 @@ app.delete("/api/expenses/:id", (req, res) => {
 
 /* ─── ڕاپۆرت (Reports) ─── */
 
-app.get("/api/reports/summary", (req, res) => {
+app.get("/api/reports/summary", adminOrUser, (req, res) => {
   const from = req.query.from || "";
   const to = req.query.to || "";
 
@@ -406,12 +636,12 @@ function rowTireCustomer(r) {
 }
 
 // 1. Inventory Endpoints
-app.get("/api/tires", (_req, res) => {
+app.get("/api/tires", adminOrTire, (_req, res) => {
   const rows = db.prepare("SELECT * FROM tires_inventory ORDER BY name COLLATE NOCASE").all();
   res.json(rows);
 });
 
-app.post("/api/tires", (req, res) => {
+app.post("/api/tires", adminOrTire, (req, res) => {
   const name = String(req.body?.name ?? "").trim();
   if (!name) return res.status(400).json({ error: "ناوی تایە پێویستە" });
   const size = String(req.body?.size ?? "").trim();
@@ -433,7 +663,7 @@ app.post("/api/tires", (req, res) => {
   }
 });
 
-app.patch("/api/tires/:id", (req, res) => {
+app.patch("/api/tires/:id", adminOrTire, (req, res) => {
   const id = Number(req.params.id);
   const cur = db.prepare("SELECT * FROM tires_inventory WHERE id = ?").get(id);
   if (!cur) return res.status(404).json({ error: "نەدۆزرایەوە" });
@@ -462,7 +692,7 @@ app.patch("/api/tires/:id", (req, res) => {
   }
 });
 
-app.delete("/api/tires/:id", (req, res) => {
+app.delete("/api/tires/:id", adminOrTire, (req, res) => {
   const id = Number(req.params.id);
   const info = db.prepare("DELETE FROM tires_inventory WHERE id = ?").run(id);
   if (info.changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
@@ -470,12 +700,12 @@ app.delete("/api/tires/:id", (req, res) => {
 });
 
 // 2. Customers Endpoints
-app.get("/api/tire-customers", (_req, res) => {
+app.get("/api/tire-customers", adminOrTire, (_req, res) => {
   const rows = db.prepare("SELECT * FROM tire_customers ORDER BY name COLLATE NOCASE").all();
   res.json(rows.map(rowTireCustomer));
 });
 
-app.post("/api/tire-customers", (req, res) => {
+app.post("/api/tire-customers", adminOrTire, (req, res) => {
   const name = String(req.body?.name ?? "").trim();
   if (!name) return res.status(400).json({ error: "ناو پێویستە" });
   const phone = String(req.body?.phone ?? "").trim();
@@ -497,7 +727,7 @@ app.post("/api/tire-customers", (req, res) => {
 });
 
 // 3. Sales Endpoints
-app.get("/api/tire-sales", (_req, res) => {
+app.get("/api/tire-sales", adminOrTire, (_req, res) => {
   const rows = db.prepare(`
     SELECT s.*, c.name AS customer_name 
     FROM tire_sales s
@@ -518,7 +748,7 @@ app.get("/api/tire-sales", (_req, res) => {
   res.json(salesWithItems);
 });
 
-app.post("/api/tire-sales", (req, res) => {
+app.post("/api/tire-sales", adminOrTire, (req, res) => {
   const customer_id = req.body?.customer_id ? Number(req.body.customer_id) : null;
   const sale_date = String(req.body?.sale_date ?? "").trim();
   const payment_type = String(req.body?.payment_type ?? "نەقد").trim();
@@ -573,7 +803,7 @@ app.post("/api/tire-sales", (req, res) => {
   }
 });
 
-app.delete("/api/tire-sales/:id", (req, res) => {
+app.delete("/api/tire-sales/:id", adminOrTire, (req, res) => {
   const saleId = Number(req.params.id);
   
   const voidSale = db.transaction(() => {
@@ -595,7 +825,7 @@ app.delete("/api/tire-sales/:id", (req, res) => {
 });
 
 // 4. Payments Endpoints
-app.get("/api/tire-payments", (req, res) => {
+app.get("/api/tire-payments", adminOrTire, (req, res) => {
   const customerId = req.query.customer_id ? Number(req.query.customer_id) : null;
   let sql = `
     SELECT p.*, c.name AS customer_name
@@ -613,7 +843,7 @@ app.get("/api/tire-payments", (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/tire-payments", (req, res) => {
+app.post("/api/tire-payments", adminOrTire, (req, res) => {
   const customer_id = Number(req.body?.customer_id);
   const payment_date = String(req.body?.payment_date ?? "").trim();
   const amount_usd = Number(req.body?.amount_usd) || 0;
@@ -632,7 +862,7 @@ app.post("/api/tire-payments", (req, res) => {
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
-app.delete("/api/tire-payments/:id", (req, res) => {
+app.delete("/api/tire-payments/:id", adminOrTire, (req, res) => {
   const id = Number(req.params.id);
   const info = db.prepare("DELETE FROM tire_payments WHERE id = ?").run(id);
   if (info.changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
@@ -640,7 +870,7 @@ app.delete("/api/tire-payments/:id", (req, res) => {
 });
 
 // 5. Reports Endpoint
-app.get("/api/tire-reports/summary", (req, res) => {
+app.get("/api/tire-reports/summary", adminOrTire, (req, res) => {
   const from = req.query.from || "";
   const to = req.query.to || "";
   

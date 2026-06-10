@@ -2,7 +2,9 @@
   "name": "gazxana-web",
   "private": true,
   "version": "1.0.0",
-  "workspaces": ["client"],
+  "workspaces": [
+    "client"
+  ],
   "scripts": {
     "dev": "concurrently -k \"cross-env PORT=3001 API_PORT=3001 node server/index.js\" \"npm run dev:client\"",
     "dev:server": "cross-env PORT=3001 API_PORT=3001 node server/index.js",
@@ -11,9 +13,10 @@
     "start": "node server/index.js"
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^12.10.0",
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

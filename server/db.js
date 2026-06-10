@@ -101,6 +101,15 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE COLLATE NOCASE,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_tire_sale_date ON tire_sales(sale_date);
   CREATE INDEX IF NOT EXISTS idx_tire_payment_date ON tire_payments(payment_date);
 `);

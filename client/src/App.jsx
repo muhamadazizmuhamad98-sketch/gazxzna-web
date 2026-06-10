@@ -146,8 +146,50 @@ const IconTireReports = () => (
     <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
   </svg>
 );
+const IconUsers = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M21 12h-3m0 0h-3m3 0V9m0 3v3" />
+  </svg>
+);
+
+// Intercept fetch to add authorization token and catch 401s
+const originalFetch = window.fetch;
+window.fetch = async (url, options = {}) => {
+  const token = localStorage.getItem("gazxana_token");
+  if (token) {
+    options.headers = {
+      ...options.headers,
+      "Authorization": `Bearer ${token}`,
+      ...options.headers
+    };
+  }
+  const response = await originalFetch(url, options);
+  if (response.status === 401 && !url.includes("/api/auth/login")) {
+    localStorage.removeItem("gazxana_token");
+    localStorage.removeItem("gazxana_user");
+    window.dispatchEvent(new Event("auth-error"));
+  }
+  return response;
+};
 
 export default function App() {
+  const [token, setToken] = useState(() => localStorage.getItem("gazxana_token") || "");
+  const [user, setUser] = useState(() => {
+    try {
+      const u = localStorage.getItem("gazxana_user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginErr, setLoginErr] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
   const [tab, setTab] = useState("daily");
   const [debtors, setDebtors] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -241,29 +283,41 @@ export default function App() {
   const [backupSecret, setBackupSecret] = useState("");
   const [backupErr, setBackupErr] = useState("");
 
+  /* ─── بەڕێوەبردنی بەکارهێنەران (ئادمین) state ─── */
+  const [managedUsers, setManagedUsers] = useState([]);
+  const [newUserForm, setNewUserForm] = useState({ username: "", password: "", displayName: "", role: "user" });
+  const [showAddUserForm, setShowAddUserForm] = useState(false);
+  const [usersErr, setUsersErr] = useState("");
+  const [usersInfo, setUsersInfo] = useState("");
+
   /* ───────── API helpers ───────── */
 
   const loadTires = useCallback(async () => {
+    if (!token) return;
     const r = await fetch(`${API}/tires`);
     if (r.ok) setTires(await r.json());
-  }, []);
+  }, [token]);
 
   const loadTireCustomers = useCallback(async () => {
+    if (!token) return;
     const r = await fetch(`${API}/tire-customers`);
     if (r.ok) setTireCustomers(await r.json());
-  }, []);
+  }, [token]);
 
   const loadTireSales = useCallback(async () => {
+    if (!token) return;
     const r = await fetch(`${API}/tire-sales`);
     if (r.ok) setTireSales(await r.json());
-  }, []);
+  }, [token]);
 
   const loadTirePayments = useCallback(async () => {
+    if (!token) return;
     const r = await fetch(`${API}/tire-payments`);
     if (r.ok) setTirePayments(await r.json());
-  }, []);
+  }, [token]);
 
   const loadTireReport = useCallback(async () => {
+    if (!token) return;
     setTireReportLoading(true);
     try {
       const p = new URLSearchParams();
@@ -274,9 +328,10 @@ export default function App() {
     } finally {
       setTireReportLoading(false);
     }
-  }, [tireReportFrom, tireReportTo]);
+  }, [tireReportFrom, tireReportTo, token]);
 
   const loadDebtors = useCallback(async () => {
+    if (!token) return;
     const r = await fetch(`${API}/debtors`);
     const raw = await r.text();
     if (!r.ok) {
@@ -285,9 +340,10 @@ export default function App() {
     const list = parseJsonFromText(raw);
     if (!Array.isArray(list)) throw new Error("وەڵامی سێرڤەر نادروستە");
     setDebtors(list);
-  }, []);
+  }, [token]);
 
   const loadTxns = useCallback(async (debtorId, q) => {
+    if (!token) return;
     const p = new URLSearchParams();
     if (debtorId) p.set("debtor_id", String(debtorId));
     if (q.trim()) p.set("q", q.trim());
@@ -299,9 +355,10 @@ export default function App() {
     const list = parseJsonFromText(raw);
     if (!Array.isArray(list)) throw new Error("وەڵامی سێرڤەر نادروستە");
     setTransactions(list);
-  }, []);
+  }, [token]);
 
   const loadExpenses = useCallback(async () => {
+    if (!token) return;
     const p = new URLSearchParams();
     if (expFilterFrom) p.set("from", expFilterFrom);
     if (expFilterTo) p.set("to", expFilterTo);
@@ -311,9 +368,10 @@ export default function App() {
     const list = parseJsonFromText(raw);
     if (!Array.isArray(list)) throw new Error("وەڵامی سێرڤەر نادروستە");
     setExpenses(list);
-  }, [expFilterFrom, expFilterTo]);
+  }, [expFilterFrom, expFilterTo, token]);
 
   const loadReport = useCallback(async () => {
+    if (!token) return;
     setReportLoading(true);
     try {
       const p = new URLSearchParams();
@@ -329,7 +387,7 @@ export default function App() {
     } finally {
       setReportLoading(false);
     }
-  }, [reportFrom, reportTo]);
+  }, [reportFrom, reportTo, token]);
 
   function handleDownloadBackup() {
     setBackupErr("");
@@ -387,6 +445,78 @@ export default function App() {
     } catch (err) {
       setBackupErr("پەیوەندی لەگەڵ سێرڤەر سەرنەکەوت.");
     }
+  }
+
+  /* ─── سێستەمی لۆگین و لۆگئاوت ─── */
+  useEffect(() => {
+    const handleAuthError = () => {
+      setToken("");
+      setUser(null);
+      setErr("کێشەیەک لە چوونیەتەژوورەوە هەیە یان دانیشتنەکەت بەسەرچووە. تکایە دووبارە بچۆرە ژوورەوە.");
+    };
+    window.addEventListener("auth-error", handleAuthError);
+    return () => {
+      window.removeEventListener("auth-error", handleAuthError);
+    };
+  }, []);
+
+  // کۆنتڕۆڵی دەستگەیشتنی تابەکان بۆ هەر بەکارهێنەرێک
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === "tire" && ["daily", "debtors", "expenses", "report"].includes(tab)) {
+      setTab("tire_inventory");
+    } else if (user.role === "user" && ["tire_inventory", "tire_sales", "tire_debtors", "tire_reports"].includes(tab)) {
+      setTab("daily");
+    }
+  }, [user, tab]);
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setLoginErr("");
+    setLoginLoading(true);
+    try {
+      const r = await originalFetch(`${API}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: loginUsername, password: loginPassword })
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        let msg = "پەیوەندی لەگەڵ سێرڤەر سەرنەکەوت";
+        try {
+          const j = JSON.parse(raw);
+          msg = j.error || msg;
+        } catch {}
+        setLoginErr(msg);
+        return;
+      }
+      const data = JSON.parse(raw);
+      localStorage.setItem("gazxana_token", data.token);
+      localStorage.setItem("gazxana_user", JSON.stringify(data.user));
+      setToken(data.token);
+      setUser(data.user);
+      setLoginUsername("");
+      setLoginPassword("");
+      if (data.user.role === "tire") {
+        setTab("tire_inventory");
+      } else {
+        setTab("daily");
+      }
+    } catch (ex) {
+      setLoginErr("پەیوەندی لەگەڵ سێرڤەر سەرنەکەوت.");
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("gazxana_token");
+    localStorage.removeItem("gazxana_user");
+    setToken("");
+    setUser(null);
+    setTab("daily");
+    setErr("");
+    setInfoMsg("");
   }
 
   const refreshDebtors = useCallback(async () => {
@@ -478,6 +608,67 @@ export default function App() {
       loadTireReport();
     }
   }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport]);
+
+  /* بارکردنی لیستی بەکارهێنەران بۆ ئادمین */
+  const loadManagedUsers = useCallback(async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`${API}/admin/users`);
+      if (r.ok) setManagedUsers(await r.json());
+    } catch {}
+  }, [token]);
+
+  useEffect(() => {
+    if (tab === "users" && user?.role === "admin") loadManagedUsers();
+  }, [tab, user, loadManagedUsers]);
+
+  async function addManagedUser(e) {
+    e.preventDefault();
+    setUsersErr("");
+    setUsersInfo("");
+    try {
+      const r = await fetch(`${API}/admin/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newUserForm),
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        let msg = "کێشەیەک ڕوویدا";
+        try { const j = JSON.parse(raw); msg = j.error || msg; } catch {}
+        setUsersErr(msg);
+        return;
+      }
+      setNewUserForm({ username: "", password: "", displayName: "", role: "user" });
+      setShowAddUserForm(false);
+      await loadManagedUsers();
+      setUsersInfo("بەکارهێنەر بە سەرکەوتوویی زیاد کرا.");
+      window.setTimeout(() => setUsersInfo(""), 4000);
+    } catch (ex) {
+      setUsersErr("پەیوەندی لەگەڵ سێرڤەر سەرنەکەوت.");
+    }
+  }
+
+  async function deleteManagedUser(username) {
+    if (!confirm(`سڕینەوەی بەکارهێنەری "${username}"؟ ئەم کردارە ناگەڕێنەوە.`)) return;
+    setUsersErr("");
+    setUsersInfo("");
+    try {
+      const r = await fetch(`${API}/admin/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+      const raw = await r.text();
+      if (!r.ok) {
+        let msg = "کێشەیەک ڕوویدا";
+        try { const j = JSON.parse(raw); msg = j.error || msg; } catch {}
+        setUsersErr(msg);
+        return;
+      }
+      await loadManagedUsers();
+      setUsersInfo("بەکارهێنەر سڕایەوە.");
+      window.setTimeout(() => setUsersInfo(""), 4000);
+    } catch (ex) {
+      setUsersErr("پەیوەندی لەگەڵ سێرڤەر سەرنەکەوت.");
+    }
+  }
 
   /* نوێکردنەوەی کورتەی قەرزداری تایەی هەڵبژێردراو */
   useEffect(() => {
@@ -1057,38 +1248,98 @@ export default function App() {
 
   /* ═══════════════════════════════════════════ RENDER ═══════════════════════════════════════════ */
 
+  if (!token || !user) {
+    return (
+      <div className="login-container">
+        <form className="login-card" onSubmit={handleLogin}>
+          <h2>چوونەژوورەوە بۆ گازخانە</h2>
+          {loginErr ? <div className="banner err" style={{ gridColumn: "span 2" }}>{loginErr}</div> : null}
+          <label className="span2">
+            ناوی بەکارهێنەر
+            <input
+              type="text"
+              value={loginUsername}
+              onChange={(e) => setLoginUsername(e.target.value)}
+              placeholder="ناوی بەکارهێنەر بنووسە"
+              required
+              autoFocus
+            />
+          </label>
+          <label className="span2">
+            وشەی نهێنی
+            <input
+              type="password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              placeholder="وشەی نهێنی بنووسە"
+              required
+            />
+          </label>
+          <button type="submit" className="primary span2" style={{ justifySelf: "stretch" }} disabled={loginLoading}>
+            {loginLoading ? "کاردەکات..." : "چوونەژوورەوە"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <header className="top">
-        <h1>گازخانە — بەڕێوەبردنی قەرز و مامەڵە</h1>
+        <div className="logo-section">
+          <h1>گازخانە — بەڕێوەبردنی قەرز و مامەڵە</h1>
+          <div className="user-profile">
+            <span>👤 {user.displayName}</span>
+            <button type="button" className="danger link logout-btn" onClick={handleLogout}>
+              دەرچوون
+            </button>
+          </div>
+        </div>
         <nav className="tabs">
-          <button type="button" className={tab === "daily" ? "on" : ""} onClick={() => switchTab("daily")}>
-            <IconDaily /> مامەڵەی ڕۆژانە
-          </button>
-          <button type="button" className={tab === "debtors" ? "on" : ""} onClick={() => switchTab("debtors")}>
-            <IconDebtors /> قەرزداران
-          </button>
-          <button type="button" className={tab === "expenses" ? "on" : ""} onClick={() => switchTab("expenses")}>
-            <IconExpenses /> مسروفات
-          </button>
-          <button type="button" className={tab === "report" ? "on" : ""} onClick={() => switchTab("report")}>
-            <IconReport /> ڕاپۆرت
-          </button>
+          {(user.role === "admin" || user.role === "user") && (
+            <>
+              <button type="button" className={tab === "daily" ? "on" : ""} onClick={() => switchTab("daily")}>
+                <IconDaily /> مامەڵەی ڕۆژانە
+              </button>
+              <button type="button" className={tab === "debtors" ? "on" : ""} onClick={() => switchTab("debtors")}>
+                <IconDebtors /> قەرزداران
+              </button>
+              <button type="button" className={tab === "expenses" ? "on" : ""} onClick={() => switchTab("expenses")}>
+                <IconExpenses /> مسروفات
+              </button>
+              <button type="button" className={tab === "report" ? "on" : ""} onClick={() => switchTab("report")}>
+                <IconReport /> ڕاپۆرت
+              </button>
+            </>
+          )}
           
-          <span className="nav-separator"></span>
+          {user.role === "admin" && <span className="nav-separator"></span>}
           
-          <button type="button" className={tab === "tire_inventory" ? "on" : ""} onClick={() => switchTab("tire_inventory")}>
-            <IconInventory /> مخزنی تایە
-          </button>
-          <button type="button" className={tab === "tire_sales" ? "on" : ""} onClick={() => switchTab("tire_sales")}>
-            <IconTireSales /> فرۆشتنی تایە
-          </button>
-          <button type="button" className={tab === "tire_debtors" ? "on" : ""} onClick={() => switchTab("tire_debtors")}>
-            <IconTireDebtors /> قەرزدارانی تایە
-          </button>
-          <button type="button" className={tab === "tire_reports" ? "on" : ""} onClick={() => switchTab("tire_reports")}>
-            <IconTireReports /> ڕاپۆرتی تایە
-          </button>
+          {(user.role === "admin" || user.role === "tire") && (
+            <>
+              <button type="button" className={tab === "tire_inventory" ? "on" : ""} onClick={() => switchTab("tire_inventory")}>
+                <IconInventory /> مخزنی تایە
+              </button>
+              <button type="button" className={tab === "tire_sales" ? "on" : ""} onClick={() => switchTab("tire_sales")}>
+                <IconTireSales /> فرۆشتنی تایە
+              </button>
+              <button type="button" className={tab === "tire_debtors" ? "on" : ""} onClick={() => switchTab("tire_debtors")}>
+                <IconTireDebtors /> قەرزدارانی تایە
+              </button>
+              <button type="button" className={tab === "tire_reports" ? "on" : ""} onClick={() => switchTab("tire_reports")}>
+                <IconTireReports /> ڕاپۆرتی تایە
+              </button>
+            </>
+          )}
+
+          {user.role === "admin" && (
+            <>
+              <span className="nav-separator"></span>
+              <button type="button" className={tab === "users" ? "on" : ""} onClick={() => switchTab("users")}>
+                <IconUsers /> بەکارهێنەران
+              </button>
+            </>
+          )}
         </nav>
       </header>
 
@@ -2575,6 +2826,164 @@ export default function App() {
               </section>
             </>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: بەڕێوەبردنی بەکارهێنەران (تەنها ئادمین) ═══════ */}
+      {tab === "users" && user?.role === "admin" ? (
+        <div className="tab-panels">
+          <section className="card" aria-labelledby="users-heading">
+            <div className="section-head">
+              <h2 id="users-heading">بەڕێوەبردنی بەکارهێنەران</h2>
+              <div className="filter-row">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => {
+                    setShowAddUserForm(!showAddUserForm);
+                    setNewUserForm({ username: "", password: "", displayName: "", role: "user" });
+                    setUsersErr("");
+                  }}
+                >
+                  {showAddUserForm ? "داخستنی فۆرم" : "➕ زیادکردنی بەکارهێنەر"}
+                </button>
+                <button type="button" className="ghost" onClick={loadManagedUsers}>
+                  نوێکردنەوە
+                </button>
+              </div>
+            </div>
+
+            {usersErr ? <div className="banner err">{usersErr}</div> : null}
+            {usersInfo ? <div className="banner ok">{usersInfo}</div> : null}
+
+            {showAddUserForm ? (
+              <div className="card-nested user-add-form">
+                <h4 style={{ marginTop: 0, marginBottom: "1rem" }}>➕ زیادکردنی بەکارهێنەری نوێ</h4>
+                <form onSubmit={addManagedUser} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem", alignItems: "end" }}>
+                  <label style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", gap: "0.25rem", color: "var(--text)" }}>
+                    ناوی بەکارهێنەر
+                    <input
+                      value={newUserForm.username}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, username: e.target.value })}
+                      placeholder="بۆ نموونە: ali"
+                      required
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", gap: "0.25rem", color: "var(--text)" }}>
+                    وشەی نهێنی
+                    <input
+                      type="password"
+                      value={newUserForm.password}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                      placeholder="وشەی نهێنی بنووسە"
+                      required
+                      autoComplete="new-password"
+                    />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", gap: "0.25rem", color: "var(--text)" }}>
+                    ناوی نیشاندان
+                    <input
+                      value={newUserForm.displayName}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, displayName: e.target.value })}
+                      placeholder="بۆ نموونە: عەلی ئەحمەد"
+                      required
+                    />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", gap: "0.25rem", color: "var(--text)" }}>
+                    ڕۆڵ
+                    <select
+                      value={newUserForm.role}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                    >
+                      <option value="admin">ئادمین (هەموو بەشەکان)</option>
+                      <option value="user">بەکارهێنەر (مامەڵەکان)</option>
+                      <option value="tire">بەکارهێنەر (تایە)</option>
+                    </select>
+                  </label>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button type="submit" className="primary" style={{ minHeight: "2.2rem", flex: 1 }}>
+                      پاشەکەوتکردن
+                    </button>
+                    <button type="button" className="ghost" style={{ minHeight: "2.2rem" }} onClick={() => {
+                      setShowAddUserForm(false);
+                      setNewUserForm({ username: "", password: "", displayName: "", role: "user" });
+                      setUsersErr("");
+                    }}>
+                      پاشگەزبوونەوە
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : null}
+
+            <div className="table-wrap" style={{ marginTop: "1rem" }}>
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>ناوی بەکارهێنەر</th>
+                    <th>ناوی نیشاندان</th>
+                    <th>ڕۆڵ</th>
+                    <th>جۆر</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {managedUsers.map((u) => (
+                    <tr key={u.username}>
+                      <td><strong>{u.username}</strong></td>
+                      <td>{u.displayName}</td>
+                      <td>
+                        <span className={`role-badge role-${u.role}`}>
+                          {u.role === "admin" ? "ئادمین" : u.role === "user" ? "مامەڵەکان" : "تایە"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`system-badge ${u.isSystem ? "system" : "custom"}`}>
+                          {u.isSystem ? "سیستەمی" : "داتابەیسی"}
+                        </span>
+                      </td>
+                      <td>
+                        {!u.isSystem ? (
+                          <button type="button" className="danger link" onClick={() => deleteManagedUser(u.username)}>
+                            سڕینەوە
+                          </button>
+                        ) : (
+                          <span className="muted" style={{ fontSize: "0.78rem" }}>ناسڕدرێتەوە</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {managedUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
+                        هیچ بەکارهێنەرێک نەدۆزرایەوە.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* یارمەتی ڕۆڵەکان */}
+          <section className="card" style={{ background: "var(--bg)", borderStyle: "dashed" }}>
+            <h3 style={{ margin: "0 0 0.75rem" }}>ڕێنمایی ڕۆڵەکان</h3>
+            <div className="roles-guide">
+              <div className="role-guide-item">
+                <span className="role-badge role-admin">ئادمین</span>
+                <span>هەموو بەشەکان دەبینێت و دەتوانێت بەکارهێنەر زیاد بکات و بسڕێتەوە</span>
+              </div>
+              <div className="role-guide-item">
+                <span className="role-badge role-user">مامەڵەکان</span>
+                <span>مامەڵەی ڕۆژانە، قەرزداران، مسروفات، ڕاپۆرت</span>
+              </div>
+              <div className="role-guide-item">
+                <span className="role-badge role-tire">تایە</span>
+                <span>مخزنی تایە، فرۆشتنی تایە، قەرزدارانی تایە، ڕاپۆرتی تایە</span>
+              </div>
+            </div>
+          </section>
         </div>
       ) : null}
     </div>

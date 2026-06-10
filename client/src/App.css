@@ -958,3 +958,191 @@ button.danger.link:hover {
     gap: 0.4rem;
   }
 }
+
+/* ─── لۆگین و پرۆفایل ─── */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  padding: 1.5rem;
+}
+
+.login-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.4s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.login-card h2 {
+  margin: 0 0 0.5rem;
+  color: #0f172a;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.login-card label {
+  color: #475569;
+}
+
+.login-card input {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+.login-card button.primary {
+  width: 100%;
+  grid-column: span 2;
+  margin-top: 0.5rem;
+  font-size: 1.05rem;
+  padding: 0.75rem;
+  background: #2563eb;
+}
+
+.login-card button.primary:hover {
+  background: #1d4ed8;
+}
+
+.logo-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  background: var(--card);
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.user-profile span {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--owe) !important;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem !important;
+  min-height: auto !important;
+}
+
+.logout-btn:hover {
+  color: #ef4444 !important;
+}
+
+/* ═══════ بەشی بەڕێوەبردنی بەکارهێنەران ═══════ */
+
+.role-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.role-admin {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.role-user {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1e40af;
+  border: 1px solid #60a5fa;
+}
+
+.role-tire {
+  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+  color: #3730a3;
+  border: 1px solid #818cf8;
+}
+
+.system-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.system-badge.system {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.system-badge.custom {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.user-add-form {
+  background: #f8fafc;
+  margin: 1rem 0;
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  animation: fadeIn 0.3s ease;
+}
+
+.user-add-form h4 {
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.roles-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.role-guide-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.role-guide-item:hover {
+  transform: translateX(-3px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.role-guide-item .role-badge {
+  min-width: 80px;
+  text-align: center;
+}
+
