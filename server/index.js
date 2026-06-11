@@ -312,6 +312,26 @@ app.delete("/api/admin/users/:username", adminOnly, (req, res) => {
 
 function rowDebtor(r) {
   const bal = balancesForDebtor(r.id);
+  
+  // Find latest USD and IQD debt transactions
+  const latestUsdRow = db.prepare(`
+    SELECT debt_usd FROM transactions 
+    WHERE debtor_id = ? AND (txn_type = 'قەرز' OR debt_usd > 0)
+    ORDER BY txn_date DESC, id DESC LIMIT 1
+  `).get(r.id);
+
+  const latestIqdRow = db.prepare(`
+    SELECT debt_iqd FROM transactions 
+    WHERE debtor_id = ? AND (txn_type = 'قەرز' OR debt_iqd > 0)
+    ORDER BY txn_date DESC, id DESC LIMIT 1
+  `).get(r.id);
+
+  const latest_debt_usd = latestUsdRow ? latestUsdRow.debt_usd : 0;
+  const latest_debt_iqd = latestIqdRow ? latestIqdRow.debt_iqd : 0;
+
+  const previous_debt_usd = bal.balance_usd - latest_debt_usd;
+  const previous_debt_iqd = bal.balance_iqd - latest_debt_iqd;
+
   return {
     id: r.id,
     name: r.name,
@@ -320,6 +340,10 @@ function rowDebtor(r) {
     created_at: r.created_at,
     balance_usd: bal.balance_usd,
     balance_iqd: bal.balance_iqd,
+    latest_debt_usd,
+    previous_debt_usd,
+    latest_debt_iqd,
+    previous_debt_iqd,
   };
 }
 
@@ -623,6 +647,18 @@ function balancesForTireCustomer(customerId, initialBalanceUsd = 0) {
 
 function rowTireCustomer(r) {
   const bal = balancesForTireCustomer(r.id, r.initial_balance_usd || 0);
+
+  // Find latest debt transaction for tire customer (from tire sales)
+  const latestSaleRow = db.prepare(`
+    SELECT (total_usd - paid_usd) AS debt_usd
+    FROM tire_sales
+    WHERE customer_id = ? AND payment_type = 'قەرز' AND (total_usd - paid_usd) > 0
+    ORDER BY sale_date DESC, id DESC LIMIT 1
+  `).get(r.id);
+  
+  const latest_debt_usd = latestSaleRow ? latestSaleRow.debt_usd : 0;
+  const previous_debt_usd = bal.balance_usd - latest_debt_usd;
+
   return {
     id: r.id,
     name: r.name,
@@ -632,6 +668,8 @@ function rowTireCustomer(r) {
     created_at: r.created_at,
     balance_usd: bal.balance_usd,
     balance_iqd: bal.balance_iqd,
+    latest_debt_usd,
+    previous_debt_usd,
   };
 }
 

@@ -1544,18 +1544,47 @@ export default function App() {
               {debtorsFocusDetail.note ? (
                 <p className="muted small">تێبینی: {debtorsFocusDetail.note}</p>
               ) : null}
-              <div className="balance-bar debtor-totals">
-                <div>
-                  <span className="lbl">کۆی قەرز بە دۆلار</span>
-                  <strong className={debtorsFocusDetail.balance_usd > 0 ? "owe" : "ok"}>
-                    {fmtMoney(debtorsFocusDetail.balance_usd, "usd")}
-                  </strong>
+              <div className="balance-bar debtor-totals" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", background: "none", border: "none", padding: 0 }}>
+                <div style={{ background: "rgba(59, 130, 246, 0.05)", padding: "1rem", borderRadius: "8px", border: "1px solid rgba(59, 130, 246, 0.1)" }}>
+                  <h4 style={{ margin: "0 0 0.75rem 0", color: "var(--primary)", borderBottom: "1px solid rgba(59, 130, 246, 0.15)", paddingBottom: "0.25rem" }}>حیسابی دۆلار ($)</h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span className="lbl">قەرزی پێشوو:</span>
+                      <strong style={{ color: "var(--text)" }}>{fmtMoney(debtorsFocusDetail.previous_debt_usd, "usd")}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span className="lbl">قەرزی ئێستا:</span>
+                      <strong style={{ color: "var(--owe)", fontWeight: "700" }}>{fmtMoney(debtorsFocusDetail.latest_debt_usd, "usd")}</strong>
+                    </div>
+                    <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "0.25rem 0" }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="lbl" style={{ fontWeight: "700", color: "var(--text)" }}>کۆی گشتی قەرز:</span>
+                      <strong className={debtorsFocusDetail.balance_usd > 0 ? "owe" : "ok"} style={{ fontSize: "1.2rem", fontWeight: "800" }}>
+                        {fmtMoney(debtorsFocusDetail.balance_usd, "usd")}
+                      </strong>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="lbl">کۆی قەرز بە دینار</span>
-                  <strong className={debtorsFocusDetail.balance_iqd > 0 ? "owe" : "ok"}>
-                    {fmtMoney(debtorsFocusDetail.balance_iqd, "iqd")}
-                  </strong>
+
+                <div style={{ background: "rgba(59, 130, 246, 0.05)", padding: "1rem", borderRadius: "8px", border: "1px solid rgba(59, 130, 246, 0.1)" }}>
+                  <h4 style={{ margin: "0 0 0.75rem 0", color: "var(--primary)", borderBottom: "1px solid rgba(59, 130, 246, 0.15)", paddingBottom: "0.25rem" }}>حیسابی دینار (د.ع)</h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span className="lbl">قەرزی پێشوو:</span>
+                      <strong style={{ color: "var(--text)" }}>{fmtMoney(debtorsFocusDetail.previous_debt_iqd, "iqd")}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span className="lbl">قەرزی ئێستا:</span>
+                      <strong style={{ color: "var(--owe)", fontWeight: "700" }}>{fmtMoney(debtorsFocusDetail.latest_debt_iqd, "iqd")}</strong>
+                    </div>
+                    <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "0.25rem 0" }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="lbl" style={{ fontWeight: "700", color: "var(--text)" }}>کۆی گشتی قەرز:</span>
+                      <strong className={debtorsFocusDetail.balance_iqd > 0 ? "owe" : "ok"} style={{ fontSize: "1.2rem", fontWeight: "800" }}>
+                        {fmtMoney(debtorsFocusDetail.balance_iqd, "iqd")}
+                      </strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
@@ -2721,10 +2750,21 @@ export default function App() {
                     </button>
                   </div>
                   
-                  <div className="balance-inline" style={{ width: "100%", margin: "0.5rem 0 1rem", background: "var(--debt-bg)" }}>
-                    <div>
-                      <span className="lbl">ماوەی قەرز بە دۆلار</span>
-                      <strong style={{ color: "var(--owe)" }}>{fmtMoney(focusedTireCustomerDetail.balance_usd, "usd")}</strong>
+                  <div className="card-nested" style={{ background: "var(--debt-bg)", padding: "1rem", borderRadius: "8px", margin: "0.5rem 0 1rem", border: "1px solid var(--debt-border)" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span className="lbl" style={{ color: "var(--text)" }}>قەرزی پێشوو:</span>
+                        <strong style={{ color: "var(--text)" }}>{fmtMoney(focusedTireCustomerDetail.previous_debt_usd, "usd")}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span className="lbl" style={{ color: "var(--text)" }}>قەرزی ئێستا:</span>
+                        <strong style={{ color: "var(--owe)", fontWeight: "700" }}>{fmtMoney(focusedTireCustomerDetail.latest_debt_usd, "usd")}</strong>
+                      </div>
+                      <hr style={{ border: "none", borderTop: "1px solid var(--debt-border)", margin: "0.25rem 0" }} />
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span className="lbl" style={{ fontWeight: "700", color: "var(--text)" }}>کۆی گشتی قەرز:</span>
+                        <strong style={{ color: "var(--owe)", fontSize: "1.2rem", fontWeight: "800" }}>{fmtMoney(focusedTireCustomerDetail.balance_usd, "usd")}</strong>
+                      </div>
                     </div>
                   </div>
 
