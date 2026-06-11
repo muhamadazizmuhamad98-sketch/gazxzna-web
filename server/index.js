@@ -967,6 +967,89 @@ app.get("/api/tire-reports/summary", adminOrTire, (req, res) => {
 });
 
 
+// 6. Sold Items Summary Endpoint
+app.get("/api/tire-reports/sold-items", adminOrTire, (req, res) => {
+  const from = req.query.from || "";
+  const to = req.query.to || "";
+
+  // کۆی گشتی پارەی دراو بۆ مخزن (نرخی کڕین × بڕی سەرەتایی)
+  // ئەمە هەموو تایەکانی مخزن دەگرێتەوە: ئەوانەی ماوە + ئەوانەی فرۆشراوە
+  const currentStock = db.prepare(`
+    SELECT 
+      COALESCE(SUM(quantity * purchase_price_usd), 0) AS current_stock_cost_usd,
+      COALESCE(SUM(quantity), 0) AS current_stock_qty
+    FROM tires_inventory
+  `).get();
+
+  // کۆی تایەی فرۆشراو و نرخی کڕینی هەر تایەیەک
+  let soldSql = `
+    SELECT 
+      t.name AS tire_name,
+      t.size AS tire_size,
+      t.purchase_price_usd,
+      SUM(i.quantity) AS total_sold_qty,
+      SUM(i.quantity * i.price_usd) AS total_revenue_usd,
+      SUM(i.quantity * t.purchase_price_usd) AS total_cost_usd
+    FROM tire_sale_items i
+    JOIN tires_inventory t ON t.id = i.tire_id
+    JOIN tire_sales s ON s.id = i.sale_id
+    WHERE 1=1
+  `;
+  const soldParams = [];
+  if (from) { soldSql += " AND s.sale_date >= ?"; soldParams.push(from); }
+  if (to) { soldSql += " AND s.sale_date <= ?"; soldParams.push(to); }
+  soldSql += " GROUP BY i.tire_id ORDER BY total_sold_qty DESC";
+  const soldItems = db.prepare(soldSql).all(...soldParams);
+
+  // کۆی گشتی فرۆشراو
+  const totalSoldQty = soldItems.reduce((acc, item) => acc + (item.total_sold_qty || 0), 0);
+  const totalRevenue = soldItems.reduce((acc, item) => acc + (item.total_revenue_usd || 0), 0);
+  const totalCostSold = soldItems.reduce((acc, item) => acc + (item.total_cost_usd || 0), 0);
+  const totalProfit = totalRevenue - totalCostSold;
+
+  // کۆی گشتی پارەی داو بە مخزن = نرخی کڕینی مخزنی ئێستا + نرخی کڕینی فرۆشراوەکان
+  const totalWarehouseInvestment = currentStock.current_stock_cost_usd + totalCostSold;
+
+  // لیستی تەواوی فرۆشتنەکان بە وردەکاری
+  let salesDetailSql = `
+    SELECT 
+      s.id AS sale_id,
+      s.sale_date,
+      s.payment_type,
+      COALESCE(c.name, 'نەقد (کاش)') AS customer_name,
+      i.quantity AS sold_qty,
+      i.price_usd AS sale_price,
+      t.name AS tire_name,
+      t.purchase_price_usd,
+      (i.quantity * i.price_usd) AS line_revenue,
+      (i.quantity * t.purchase_price_usd) AS line_cost,
+      (i.quantity * i.price_usd) - (i.quantity * t.purchase_price_usd) AS line_profit
+    FROM tire_sale_items i
+    JOIN tires_inventory t ON t.id = i.tire_id
+    JOIN tire_sales s ON s.id = i.sale_id
+    LEFT JOIN tire_customers c ON c.id = s.customer_id
+    WHERE 1=1
+  `;
+  const detailParams = [];
+  if (from) { salesDetailSql += " AND s.sale_date >= ?"; detailParams.push(from); }
+  if (to) { salesDetailSql += " AND s.sale_date <= ?"; detailParams.push(to); }
+  salesDetailSql += " ORDER BY s.sale_date DESC, s.id DESC";
+  const salesDetail = db.prepare(salesDetailSql).all(...detailParams);
+
+  res.json({
+    current_stock_cost_usd: currentStock.current_stock_cost_usd,
+    current_stock_qty: currentStock.current_stock_qty,
+    total_sold_qty: totalSoldQty,
+    total_revenue_usd: totalRevenue,
+    total_cost_sold_usd: totalCostSold,
+    total_profit_usd: totalProfit,
+    total_warehouse_investment_usd: totalWarehouseInvestment,
+    sold_by_tire: soldItems,
+    sales_detail: salesDetail,
+  });
+});
+
+
 const clientDist = path.join(__dirname, "..", "client", "dist");
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(clientDist));

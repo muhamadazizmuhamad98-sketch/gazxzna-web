@@ -146,6 +146,12 @@ const IconTireReports = () => (
     <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
   </svg>
 );
+const IconSoldItems = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    <path d="M9 14l2 2 4-4" />
+  </svg>
+);
 const IconUsers = () => (
   <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
     <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" />
@@ -279,6 +285,14 @@ export default function App() {
   const [tireReportFrom, setTireReportFrom] = useState("");
   const [tireReportTo, setTireReportTo] = useState("");
   const [tireReportLoading, setTireReportLoading] = useState(false);
+
+  /* ─── فرۆشراوەکان state ─── */
+  const [soldItems, setSoldItems] = useState(null);
+  const [soldItemsFrom, setSoldItemsFrom] = useState("");
+  const [soldItemsTo, setSoldItemsTo] = useState("");
+  const [soldItemsLoading, setSoldItemsLoading] = useState(false);
+  const [soldByTireSort, setSoldByTireSort] = useState({ key: "total_revenue_usd", dir: "desc" });
+  const [soldDetailSort, setSoldDetailSort] = useState({ key: "line_revenue", dir: "desc" });
   
   const [backupSecret, setBackupSecret] = useState("");
   const [backupErr, setBackupErr] = useState("");
@@ -293,31 +307,31 @@ export default function App() {
   /* ───────── API helpers ───────── */
 
   const loadTires = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user || user.role === "user") return;
     const r = await fetch(`${API}/tires`);
     if (r.ok) setTires(await r.json());
-  }, [token]);
+  }, [token, user]);
 
   const loadTireCustomers = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user || user.role === "user") return;
     const r = await fetch(`${API}/tire-customers`);
     if (r.ok) setTireCustomers(await r.json());
-  }, [token]);
+  }, [token, user]);
 
   const loadTireSales = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user || user.role === "user") return;
     const r = await fetch(`${API}/tire-sales`);
     if (r.ok) setTireSales(await r.json());
-  }, [token]);
+  }, [token, user]);
 
   const loadTirePayments = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user || user.role === "user") return;
     const r = await fetch(`${API}/tire-payments`);
     if (r.ok) setTirePayments(await r.json());
-  }, [token]);
+  }, [token, user]);
 
   const loadTireReport = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user || user.role === "user") return;
     setTireReportLoading(true);
     try {
       const p = new URLSearchParams();
@@ -328,10 +342,24 @@ export default function App() {
     } finally {
       setTireReportLoading(false);
     }
-  }, [tireReportFrom, tireReportTo, token]);
+  }, [tireReportFrom, tireReportTo, token, user]);
+
+  const loadSoldItems = useCallback(async () => {
+    if (!token || !user || user.role === "user") return;
+    setSoldItemsLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (soldItemsFrom) p.set("from", soldItemsFrom);
+      if (soldItemsTo) p.set("to", soldItemsTo);
+      const r = await fetch(`${API}/tire-reports/sold-items?` + p.toString());
+      if (r.ok) setSoldItems(await r.json());
+    } finally {
+      setSoldItemsLoading(false);
+    }
+  }, [soldItemsFrom, soldItemsTo, token, user]);
 
   const loadDebtors = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user || user.role === "tire") return;
     const r = await fetch(`${API}/debtors`);
     const raw = await r.text();
     if (!r.ok) {
@@ -340,10 +368,10 @@ export default function App() {
     const list = parseJsonFromText(raw);
     if (!Array.isArray(list)) throw new Error("وەڵامی سێرڤەر نادروستە");
     setDebtors(list);
-  }, [token]);
+  }, [token, user]);
 
   const loadTxns = useCallback(async (debtorId, q) => {
-    if (!token) return;
+    if (!token || !user || user.role === "tire") return;
     const p = new URLSearchParams();
     if (debtorId) p.set("debtor_id", String(debtorId));
     if (q.trim()) p.set("q", q.trim());
@@ -355,10 +383,10 @@ export default function App() {
     const list = parseJsonFromText(raw);
     if (!Array.isArray(list)) throw new Error("وەڵامی سێرڤەر نادروستە");
     setTransactions(list);
-  }, [token]);
+  }, [token, user]);
 
   const loadExpenses = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user || user.role === "tire") return;
     const p = new URLSearchParams();
     if (expFilterFrom) p.set("from", expFilterFrom);
     if (expFilterTo) p.set("to", expFilterTo);
@@ -368,10 +396,10 @@ export default function App() {
     const list = parseJsonFromText(raw);
     if (!Array.isArray(list)) throw new Error("وەڵامی سێرڤەر نادروستە");
     setExpenses(list);
-  }, [expFilterFrom, expFilterTo, token]);
+  }, [expFilterFrom, expFilterTo, token, user]);
 
   const loadReport = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user || user.role === "tire") return;
     setReportLoading(true);
     try {
       const p = new URLSearchParams();
@@ -387,7 +415,7 @@ export default function App() {
     } finally {
       setReportLoading(false);
     }
-  }, [reportFrom, reportTo, token]);
+  }, [reportFrom, reportTo, token, user]);
 
   function handleDownloadBackup() {
     setBackupErr("");
@@ -465,7 +493,7 @@ export default function App() {
     if (!user) return;
     if (user.role === "tire" && ["daily", "debtors", "expenses", "report"].includes(tab)) {
       setTab("tire_inventory");
-    } else if (user.role === "user" && ["tire_inventory", "tire_sales", "tire_debtors", "tire_reports"].includes(tab)) {
+    } else if (user.role === "user" && ["tire_inventory", "tire_sales", "tire_debtors", "tire_reports", "tire_sold_items"].includes(tab)) {
       setTab("daily");
     }
   }, [user, tab]);
@@ -553,7 +581,7 @@ export default function App() {
   }, [refreshTxns]);
 
   useEffect(() => {
-    if (!selectedId) {
+    if (!selectedId || !token || !user || user.role === "tire") {
       setSummary(null);
       return;
     }
@@ -565,7 +593,7 @@ export default function App() {
     return () => {
       cancel = true;
     };
-  }, [selectedId, debtors, transactions]);
+  }, [selectedId, debtors, transactions, token, user]);
 
   useEffect(() => {
     if (tab !== "debtors" || !debtorsFocusId) {
@@ -606,8 +634,10 @@ export default function App() {
       loadTirePayments();
     } else if (tab === "tire_reports") {
       loadTireReport();
+    } else if (tab === "tire_sold_items") {
+      loadSoldItems();
     }
-  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport]);
+  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport, loadSoldItems]);
 
   /* بارکردنی لیستی بەکارهێنەران بۆ ئادمین */
   const loadManagedUsers = useCallback(async () => {
@@ -1217,6 +1247,38 @@ export default function App() {
     return { usd };
   }, [tireCustomers]);
 
+  /* ─── سۆرتکراوی فرۆشراوەکان ─── */
+  const sortedSoldByTire = useMemo(() => {
+    if (!soldItems || !soldItems.sold_by_tire) return [];
+    const list = soldItems.sold_by_tire.map(item => ({
+      ...item,
+      profit: (item.total_revenue_usd || 0) - (item.total_cost_usd || 0)
+    }));
+    const { key, dir } = soldByTireSort;
+    list.sort((a, b) => {
+      let av = a[key] ?? 0, bv = b[key] ?? 0;
+      if (typeof av === "string") { av = av.toLowerCase(); bv = (bv || "").toLowerCase(); }
+      if (av < bv) return dir === "asc" ? -1 : 1;
+      if (av > bv) return dir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [soldItems, soldByTireSort]);
+
+  const sortedSoldDetail = useMemo(() => {
+    if (!soldItems || !soldItems.sales_detail) return [];
+    const list = [...soldItems.sales_detail];
+    const { key, dir } = soldDetailSort;
+    list.sort((a, b) => {
+      let av = a[key] ?? 0, bv = b[key] ?? 0;
+      if (typeof av === "string") { av = av.toLowerCase(); bv = (bv || "").toLowerCase(); }
+      if (av < bv) return dir === "asc" ? -1 : 1;
+      if (av > bv) return dir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [soldItems, soldDetailSort]);
+
   const cartTotals = useMemo(() => {
     let usd = 0;
     cart.forEach((i) => {
@@ -1325,6 +1387,9 @@ export default function App() {
               </button>
               <button type="button" className={tab === "tire_debtors" ? "on" : ""} onClick={() => switchTab("tire_debtors")}>
                 <IconTireDebtors /> قەرزدارانی تایە
+              </button>
+              <button type="button" className={tab === "tire_sold_items" ? "on" : ""} onClick={() => switchTab("tire_sold_items")}>
+                <IconSoldItems /> فرۆشراوەکان
               </button>
               <button type="button" className={tab === "tire_reports" ? "on" : ""} onClick={() => switchTab("tire_reports")}>
                 <IconTireReports /> ڕاپۆرتی تایە
@@ -2740,6 +2805,218 @@ export default function App() {
               </div>
             ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: فرۆشراوەکان (Sold Items) ═══════ */}
+      {tab === "tire_sold_items" ? (
+        <div className="tab-panels">
+          <section className="card">
+            <div className="section-head">
+              <h2>فرۆشراوەکان — کۆی گشتی پارەی دراو بە مخزن</h2>
+              <div className="filter-row">
+                <label className="filter-label">
+                  لە
+                  <input type="date" value={soldItemsFrom} onChange={(e) => setSoldItemsFrom(e.target.value)} />
+                </label>
+                <label className="filter-label">
+                  بۆ
+                  <input type="date" value={soldItemsTo} onChange={(e) => setSoldItemsTo(e.target.value)} />
+                </label>
+                <button type="button" className="ghost" onClick={loadSoldItems}>
+                  نوێکردنەوە
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {soldItemsLoading ? (
+            <section className="card"><div className="banner">بارکردن…</div></section>
+          ) : soldItems ? (
+            <>
+              {/* کارتەکانی کورتە */}
+              <div className="report-cards">
+                <div className="rpt-card rpt-expense" style={{ borderRight: "3px solid #8b5cf6" }}>
+                  <span className="rpt-label" style={{ color: "#8b5cf6" }}>کۆی گشتی پارەی دراو بە مخزن</span>
+                  <strong style={{ color: "#8b5cf6", fontSize: "1.3rem" }}>{fmtMoney(soldItems.total_warehouse_investment_usd, "usd")}</strong>
+                  <span className="rpt-sub">ئەو پارەیەی تاکو ئێستا بۆ مخزنکردنی تایە خەرج کراوە</span>
+                </div>
+                <div className="rpt-card rpt-remain" style={{ borderRight: "3px solid #06b6d4" }}>
+                  <span className="rpt-label" style={{ color: "#06b6d4" }}>بەهای مخزنی ئێستا (کڕین)</span>
+                  <strong style={{ color: "#06b6d4" }}>{fmtMoney(soldItems.current_stock_cost_usd, "usd")}</strong>
+                  <span className="rpt-sub">{soldItems.current_stock_qty} دانە لە مخزن ماوە</span>
+                </div>
+                <div className="rpt-card rpt-pay">
+                  <span className="rpt-label">کۆی فرۆشراو</span>
+                  <strong>{soldItems.total_sold_qty} دانە</strong>
+                </div>
+                <div className="rpt-card rpt-pay" style={{ borderRight: "3px solid #22c55e" }}>
+                  <span className="rpt-label" style={{ color: "#22c55e" }}>کۆی داهات لە فرۆشتن</span>
+                  <strong style={{ color: "#22c55e" }}>{fmtMoney(soldItems.total_revenue_usd, "usd")}</strong>
+                </div>
+                <div className="rpt-card rpt-debt">
+                  <span className="rpt-label">تێچووی فرۆشراوەکان (نرخی کڕین)</span>
+                  <strong>{fmtMoney(soldItems.total_cost_sold_usd, "usd")}</strong>
+                </div>
+                <div className="rpt-card" style={{ borderRight: `3px solid ${soldItems.total_profit_usd >= 0 ? "var(--ok)" : "var(--owe)"}`, background: soldItems.total_profit_usd >= 0 ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)" }}>
+                  <span className="rpt-label" style={{ color: soldItems.total_profit_usd >= 0 ? "var(--ok)" : "var(--owe)" }}>قازانجی سافی</span>
+                  <strong style={{ color: soldItems.total_profit_usd >= 0 ? "var(--ok)" : "var(--owe)", fontSize: "1.2rem" }}>{fmtMoney(soldItems.total_profit_usd, "usd")}</strong>
+                  <span className="rpt-sub">داهات − نرخی کڕین</span>
+                </div>
+              </div>
+
+              {/* کورتەی فرۆشراوەکان بەپێی جۆری تایە */}
+              <section className="card" aria-labelledby="sold-by-tire-heading">
+                <h2 id="sold-by-tire-heading">کورتەی فرۆشراوەکان بەپێی جۆری تایە</h2>
+                <p className="muted" style={{ fontSize: "0.82rem", margin: "-0.5rem 0 0.75rem" }}>کلیک بکە لەسەر سەرەوەی ستوون بۆ ڕیزبەندیکردن — گرانترین یان زۆرترین لە سەرەوە</p>
+                {sortedSoldByTire.length > 0 ? (
+                  <div className="table-wrap">
+                    <table className="data compact">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldByTireSort(s => ({ key: "tire_name", dir: s.key === "tire_name" && s.dir === "asc" ? "desc" : "asc" }))}>
+                              جۆری تایە {soldByTireSort.key === "tire_name" ? (soldByTireSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>قەبارە</th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldByTireSort(s => ({ key: "purchase_price_usd", dir: s.key === "purchase_price_usd" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              نرخی کڕین {soldByTireSort.key === "purchase_price_usd" ? (soldByTireSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldByTireSort(s => ({ key: "total_sold_qty", dir: s.key === "total_sold_qty" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              ژمارەی فرۆشراو {soldByTireSort.key === "total_sold_qty" ? (soldByTireSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldByTireSort(s => ({ key: "total_cost_usd", dir: s.key === "total_cost_usd" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              تێچووی کڕین {soldByTireSort.key === "total_cost_usd" ? (soldByTireSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldByTireSort(s => ({ key: "total_revenue_usd", dir: s.key === "total_revenue_usd" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              داهاتی فرۆشتن {soldByTireSort.key === "total_revenue_usd" ? (soldByTireSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldByTireSort(s => ({ key: "profit", dir: s.key === "profit" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              قازانج {soldByTireSort.key === "profit" ? (soldByTireSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedSoldByTire.map((item, idx) => (
+                            <tr key={idx}>
+                              <td className="muted">{idx + 1}</td>
+                              <td><strong>{item.tire_name}</strong></td>
+                              <td className="muted">{item.tire_size || "—"}</td>
+                              <td className="num">{fmtMoney(item.purchase_price_usd, "usd")}</td>
+                              <td className="num" style={{ fontWeight: "700", color: "var(--primary)" }}>{item.total_sold_qty} دانە</td>
+                              <td className="num debt">{fmtMoney(item.total_cost_usd, "usd")}</td>
+                              <td className="num" style={{ color: "var(--ok)" }}>{fmtMoney(item.total_revenue_usd, "usd")}</td>
+                              <td className="num" style={{ fontWeight: "700", color: item.profit >= 0 ? "var(--ok)" : "var(--owe)" }}>{fmtMoney(item.profit, "usd")}</td>
+                            </tr>
+                        ))}
+                        {/* ڕیزی کۆی گشتی */}
+                        <tr style={{ background: "var(--bg)", fontWeight: "700", borderTop: "2px solid var(--border)" }}>
+                          <td></td>
+                          <td>کۆی گشتی</td>
+                          <td></td>
+                          <td></td>
+                          <td className="num" style={{ color: "var(--primary)" }}>{soldItems.total_sold_qty} دانە</td>
+                          <td className="num debt">{fmtMoney(soldItems.total_cost_sold_usd, "usd")}</td>
+                          <td className="num" style={{ color: "var(--ok)" }}>{fmtMoney(soldItems.total_revenue_usd, "usd")}</td>
+                          <td className="num" style={{ color: soldItems.total_profit_usd >= 0 ? "var(--ok)" : "var(--owe)" }}>{fmtMoney(soldItems.total_profit_usd, "usd")}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="muted" style={{ textAlign: "center" }}>هیچ تایەیەک فرۆشراو نییە لەم بەروارەدا.</p>
+                )}
+              </section>
+
+              {/* وردەکاری تەواوی فرۆشتنەکان */}
+              <section className="card" aria-labelledby="sold-detail-heading">
+                <h2 id="sold-detail-heading">وردەکاری هەموو فرۆشراوەکان</h2>
+                {sortedSoldDetail.length > 0 ? (
+                  <div className="table-wrap scroll">
+                    <table className="data compact">
+                      <thead>
+                        <tr>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldDetailSort(s => ({ key: "sale_date", dir: s.key === "sale_date" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              ڕێکەوت {soldDetailSort.key === "sale_date" ? (soldDetailSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldDetailSort(s => ({ key: "customer_name", dir: s.key === "customer_name" && s.dir === "asc" ? "desc" : "asc" }))}>
+                              کڕیار {soldDetailSort.key === "customer_name" ? (soldDetailSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldDetailSort(s => ({ key: "tire_name", dir: s.key === "tire_name" && s.dir === "asc" ? "desc" : "asc" }))}>
+                              جۆری تایە {soldDetailSort.key === "tire_name" ? (soldDetailSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>بڕ</th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldDetailSort(s => ({ key: "purchase_price_usd", dir: s.key === "purchase_price_usd" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              نرخی کڕین {soldDetailSort.key === "purchase_price_usd" ? (soldDetailSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldDetailSort(s => ({ key: "sale_price", dir: s.key === "sale_price" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              نرخی فرۆشتن {soldDetailSort.key === "sale_price" ? (soldDetailSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldDetailSort(s => ({ key: "line_revenue", dir: s.key === "line_revenue" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              داهات {soldDetailSort.key === "line_revenue" ? (soldDetailSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldDetailSort(s => ({ key: "line_cost", dir: s.key === "line_cost" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              تێچوو {soldDetailSort.key === "line_cost" ? (soldDetailSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="sort-btn" onClick={() => setSoldDetailSort(s => ({ key: "line_profit", dir: s.key === "line_profit" && s.dir === "desc" ? "asc" : "desc" }))}>
+                              قازانج {soldDetailSort.key === "line_profit" ? (soldDetailSort.dir === "asc" ? "↑" : "↓") : "⇅"}
+                            </button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedSoldDetail.map((d, idx) => (
+                          <tr key={idx}>
+                            <td>{d.sale_date}</td>
+                            <td>
+                              <strong>{d.customer_name}</strong>
+                              <div className="muted small">{d.payment_type}</div>
+                            </td>
+                            <td>{d.tire_name}</td>
+                            <td className="num">{d.sold_qty} دانە</td>
+                            <td className="num muted">{fmtMoney(d.purchase_price_usd, "usd")}</td>
+                            <td className="num">{fmtMoney(d.sale_price, "usd")}</td>
+                            <td className="num" style={{ color: "var(--ok)" }}>{fmtMoney(d.line_revenue, "usd")}</td>
+                            <td className="num debt">{fmtMoney(d.line_cost, "usd")}</td>
+                            <td className="num" style={{ fontWeight: "600", color: d.line_profit >= 0 ? "var(--ok)" : "var(--owe)" }}>{fmtMoney(d.line_profit, "usd")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="muted" style={{ textAlign: "center" }}>هیچ فرۆشتنێک تۆمار نەکراوە.</p>
+                )}
+              </section>
+            </>
+          ) : null}
         </div>
       ) : null}
 

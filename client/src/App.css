@@ -646,6 +646,27 @@ table.data tbody tr:hover {
   background: rgba(59, 130, 246, 0.06);
 }
 
+/* sort button in table headers */
+.sort-btn {
+  background: none;
+  border: none;
+  padding: 0.2rem 0.1rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: color 0.15s;
+  font-size: inherit;
+}
+
+.sort-btn:hover {
+  color: var(--accent);
+}
+
 .muted {
   color: var(--muted);
 }
