@@ -294,6 +294,13 @@ export default function App() {
   const [soldByTireSort, setSoldByTireSort] = useState({ key: "total_revenue_usd", dir: "desc" });
   const [soldDetailSort, setSoldDetailSort] = useState({ key: "line_revenue", dir: "desc" });
   
+  /* ─── مسروفاتی تایە state ─── */
+  const [tireExpenses, setTireExpenses] = useState([]);
+  const [tireExpForm, setTireExpForm] = useState({ title: "", amount_iqd: "", expense_date: today, note: "" });
+  const [tireExpFilterFrom, setTireExpFilterFrom] = useState("");
+  const [tireExpFilterTo, setTireExpFilterTo] = useState("");
+  const [tireExpensesLoading, setTireExpensesLoading] = useState(false);
+  
   const [backupSecret, setBackupSecret] = useState("");
   const [backupErr, setBackupErr] = useState("");
 
@@ -357,6 +364,20 @@ export default function App() {
       setSoldItemsLoading(false);
     }
   }, [soldItemsFrom, soldItemsTo, token, user]);
+
+  const loadTireExpenses = useCallback(async () => {
+    if (!token || !user || user.role === "user") return;
+    setTireExpensesLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (tireExpFilterFrom) p.set("from", tireExpFilterFrom);
+      if (tireExpFilterTo) p.set("to", tireExpFilterTo);
+      const r = await fetch(`${API}/tire-expenses?` + p.toString());
+      if (r.ok) setTireExpenses(await r.json());
+    } finally {
+      setTireExpensesLoading(false);
+    }
+  }, [tireExpFilterFrom, tireExpFilterTo, token, user]);
 
   const loadDebtors = useCallback(async () => {
     if (!token || !user || user.role === "tire") return;
@@ -636,8 +657,17 @@ export default function App() {
       loadTireReport();
     } else if (tab === "tire_sold_items") {
       loadSoldItems();
+    } else if (tab === "tire_expenses") {
+      loadTireExpenses();
     }
-  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport, loadSoldItems]);
+  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport, loadSoldItems, loadTireExpenses]);
+
+  /* بارکردنی مسروفاتی تایە کاتێک فلتەرەکان دەگۆڕێن */
+  useEffect(() => {
+    if (tab === "tire_expenses") {
+      loadTireExpenses();
+    }
+  }, [tab, tireExpFilterFrom, tireExpFilterTo, loadTireExpenses]);
 
   /* بارکردنی لیستی بەکارهێنەران بۆ ئادمین */
   const loadManagedUsers = useCallback(async () => {
@@ -1099,6 +1129,57 @@ export default function App() {
     window.setTimeout(() => setInfoMsg(""), 3000);
   }
 
+  /* ───────── Tire Expense Actions ───────── */
+
+  async function submitTireExpense(e) {
+    e.preventDefault();
+    setErr("");
+    setInfoMsg("");
+    try {
+      const body = {
+        title: tireExpForm.title.trim(),
+        amount_iqd: num(tireExpForm.amount_iqd),
+        expense_date: tireExpForm.expense_date,
+        note: tireExpForm.note.trim()
+      };
+      const r = await fetch(`${API}/tire-expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      setTireExpForm({ title: "", amount_iqd: "", expense_date: today, note: "" });
+      await loadTireExpenses();
+      setInfoMsg("مسروف بە سەرکەوتوویی تۆمار کرا.");
+      window.setTimeout(() => setInfoMsg(""), 3000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
+
+  async function deleteTireExpense(id) {
+    if (!confirm("ئایا دڵنیای لە سڕینەوەی ئەم مسروفە؟")) return;
+    setErr("");
+    setInfoMsg("");
+    try {
+      const r = await fetch(`${API}/tire-expenses/${id}`, { method: "DELETE" });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      await loadTireExpenses();
+      setInfoMsg("مسروفەکە سڕایەوە.");
+      window.setTimeout(() => setInfoMsg(""), 3000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
+
   /* ───────── Tire Payment Actions ───────── */
 
   async function submitTirePayment(e) {
@@ -1390,6 +1471,9 @@ export default function App() {
               </button>
               <button type="button" className={tab === "tire_sold_items" ? "on" : ""} onClick={() => switchTab("tire_sold_items")}>
                 <IconSoldItems /> فرۆشراوەکان
+              </button>
+              <button type="button" className={tab === "tire_expenses" ? "on" : ""} onClick={() => switchTab("tire_expenses")}>
+                <IconExpenses /> مسروفات
               </button>
               <button type="button" className={tab === "tire_reports" ? "on" : ""} onClick={() => switchTab("tire_reports")}>
                 <IconTireReports /> ڕاپۆرتی تایە
@@ -2167,6 +2251,119 @@ export default function App() {
               </button>
             </div>
             {backupErr ? <p style={{ color: "var(--owe)", fontSize: "0.85rem", marginTop: "0.5rem" }}>{backupErr}</p> : null}
+          </section>
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: مسروفات (Tire Expenses) ═══════ */}
+      {tab === "tire_expenses" ? (
+        <div className="tab-panels">
+          <section className="card" aria-labelledby="tire-exp-add-heading">
+            <h2 id="tire-exp-add-heading">زیادکردنی مسرووف</h2>
+            <form className="grid-form" onSubmit={submitTireExpense}>
+              <label>
+                ناونیشان / چی خەرج کرا؟
+                <input
+                  value={tireExpForm.title}
+                  onChange={(e) => setTireExpForm({ ...tireExpForm, title: e.target.value })}
+                  placeholder="بۆ نموونە: کڕینی چا و قاوە"
+                  required
+                />
+              </label>
+              <label>
+                بڕ بە دینار (د.ع)
+                <input
+                  inputMode="numeric"
+                  value={tireExpForm.amount_iqd}
+                  onChange={(e) => setTireExpForm({ ...tireExpForm, amount_iqd: e.target.value })}
+                  placeholder="0"
+                  required
+                />
+              </label>
+              <label>
+                ڕێکەوت
+                <input
+                  type="date"
+                  value={tireExpForm.expense_date}
+                  onChange={(e) => setTireExpForm({ ...tireExpForm, expense_date: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="span2">
+                تێبینی
+                <input
+                  value={tireExpForm.note}
+                  onChange={(e) => setTireExpForm({ ...tireExpForm, note: e.target.value })}
+                  placeholder="ئیختیاری"
+                />
+              </label>
+              <button type="submit" className="primary">
+                تۆمارکردنی مسرووف
+              </button>
+            </form>
+          </section>
+
+          {/* کورتەی مسروفاتی تایە */}
+          <section className="card">
+            <div className="expense-summary-bar" style={{ background: "var(--debt-bg)", borderColor: "var(--debt-border)", gridTemplateColumns: "1fr" }}>
+              <div className="expense-total">
+                <span className="lbl" style={{ color: "var(--text)" }}>کۆی گشتی مسروفات بە دینار (د.ع)</span>
+                <strong className="expense-amount" style={{ color: "var(--owe)" }}>
+                  {fmtMoney(tireExpenses.reduce((acc, curr) => acc + (curr.amount_iqd || 0), 0), "iqd")}
+                </strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="card" aria-labelledby="tire-exp-list-heading">
+            <div className="section-head">
+              <h2 id="tire-exp-list-heading">لیستی مسروفات بە دینار</h2>
+              <div className="filter-row">
+                <label className="filter-label">
+                  لە
+                  <input type="date" value={tireExpFilterFrom} onChange={(e) => setTireExpFilterFrom(e.target.value)} />
+                </label>
+                <label className="filter-label">
+                  بۆ
+                  <input type="date" value={tireExpFilterTo} onChange={(e) => setTireExpFilterTo(e.target.value)} />
+                </label>
+              </div>
+            </div>
+            <div className="table-wrap scroll">
+              <table className="data compact">
+                <thead>
+                  <tr>
+                    <th>ڕێکەوت</th>
+                    <th>ناونیشانی مسرووف</th>
+                    <th>بڕ (د.ع)</th>
+                    <th>تێبینی</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tireExpenses.map((ex) => (
+                    <tr key={ex.id}>
+                      <td>{ex.expense_date}</td>
+                      <td style={{ fontWeight: "600" }}>{ex.title}</td>
+                      <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(ex.amount_iqd, "iqd")}</td>
+                      <td className="muted">{ex.note}</td>
+                      <td>
+                        <button type="button" className="danger link" onClick={() => deleteTireExpense(ex.id)}>
+                          سڕینەوە
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {tireExpenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
+                        هیچ مسرووفێک تۆمار نەکراوە.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </section>
         </div>
       ) : null}
@@ -3110,6 +3307,10 @@ export default function App() {
                 <div className="rpt-card rpt-profit">
                   <span className="rpt-label">کۆی گشتی قازانج</span>
                   <strong>{fmtMoney(tireReport.total_profit_usd, "usd")}</strong>
+                </div>
+                <div className="rpt-card rpt-expense" style={{ borderRight: "3px solid var(--owe)" }}>
+                  <span className="rpt-label" style={{ color: "var(--owe)" }}>کۆی مسروفات بە دینار</span>
+                  <strong style={{ color: "var(--owe)" }}>{fmtMoney(tireReport.total_expenses_iqd, "iqd")}</strong>
                 </div>
               </div>
 

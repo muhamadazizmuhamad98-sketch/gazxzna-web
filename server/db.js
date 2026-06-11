@@ -110,8 +110,18 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS tire_expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    amount_iqd REAL NOT NULL DEFAULT 0,
+    expense_date TEXT NOT NULL,
+    note TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_tire_sale_date ON tire_sales(sale_date);
   CREATE INDEX IF NOT EXISTS idx_tire_payment_date ON tire_payments(payment_date);
+  CREATE INDEX IF NOT EXISTS idx_tire_exp_date ON tire_expenses(expense_date);
 `);
 
 /* ─── migration: زیادکردنی ستوونی note بۆ خشتەی transactions ─── */

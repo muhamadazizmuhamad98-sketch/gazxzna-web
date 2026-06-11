@@ -223,6 +223,7 @@ app.post("/api/admin/reset-db", adminOnly, (req, res) => {
       db.prepare("DELETE FROM transactions").run();
       db.prepare("DELETE FROM debtors").run();
       db.prepare("DELETE FROM expenses").run();
+      db.prepare("DELETE FROM tire_expenses").run();
       db.pragma("foreign_keys = ON");
     })();
     res.json({ ok: true });
@@ -989,6 +990,16 @@ app.get("/api/tire-reports/summary", adminOrTire, (req, res) => {
   const outstandingDebtUsd = initialUsd + (totalOwedSales.owed_usd || 0) - (totalPayments.paid_usd || 0);
   const outstandingDebtIqd = (totalOwedSales.owed_iqd || 0) - (totalPayments.paid_iqd || 0);
   
+  let tireExpSql = `
+    SELECT COALESCE(SUM(amount_iqd), 0) AS total_expenses_iqd
+    FROM tire_expenses WHERE 1=1
+  `;
+  const tireExpParams = [];
+  if (from) { tireExpSql += " AND expense_date >= ?"; tireExpParams.push(from); }
+  if (to) { tireExpSql += " AND expense_date <= ?"; tireExpParams.push(to); }
+  const tireExpSum = db.prepare(tireExpSql).get(...tireExpParams);
+  const totalExpensesIqd = tireExpSum.total_expenses_iqd || 0;
+
   res.json({
     total_sales_usd: sales.total_sales_usd,
     total_sales_iqd: sales.total_sales_iqd,
@@ -1000,7 +1011,8 @@ app.get("/api/tire-reports/summary", adminOrTire, (req, res) => {
     stock_value_sale_usd: stock.stock_value_sale_usd || 0,
     total_tires_count: stock.total_tires_count || 0,
     popular_tires: popularTires,
-    total_profit_usd: totalProfitUsd
+    total_profit_usd: totalProfitUsd,
+    total_expenses_iqd: totalExpensesIqd
   });
 });
 
@@ -1085,6 +1097,61 @@ app.get("/api/tire-reports/sold-items", adminOrTire, (req, res) => {
     sold_by_tire: soldItems,
     sales_detail: salesDetail,
   });
+});
+
+
+// ─── مسروفاتی تایە (Tire Expenses) ───
+app.get("/api/tire-expenses", adminOrTire, (req, res) => {
+  const from = req.query.from || "";
+  const to = req.query.to || "";
+  let sql = "SELECT * FROM tire_expenses WHERE 1=1";
+  const params = [];
+  if (from) {
+    sql += " AND expense_date >= ?";
+    params.push(from);
+  }
+  if (to) {
+    sql += " AND expense_date <= ?";
+    params.push(to);
+  }
+  sql += " ORDER BY expense_date DESC, id DESC LIMIT 500";
+  const rows = db.prepare(sql).all(...params);
+  res.json(rows);
+});
+
+app.post("/api/tire-expenses", adminOrTire, (req, res) => {
+  const title = String(req.body?.title ?? "").trim();
+  const amount_iqd = Number(req.body?.amount_iqd) || 0;
+  const expense_date = String(req.body?.expense_date ?? "").trim();
+  const note = String(req.body?.note ?? "").trim();
+
+  if (!title) return res.status(400).json({ error: "ناوی مسروف پێویستە" });
+  if (amount_iqd <= 0) return res.status(400).json({ error: "بڕی مسروف دەبێت لە سفر گەورەتر بێت" });
+  if (!expense_date) return res.status(400).json({ error: "ڕێکەوت پێویستە" });
+
+  try {
+    const info = db.prepare(`
+      INSERT INTO tire_expenses (title, amount_iqd, expense_date, note)
+      VALUES (?, ?, ?, ?)
+    `).run(title, amount_iqd, expense_date, note);
+    const row = db.prepare("SELECT * FROM tire_expenses WHERE id = ?").get(info.lastInsertRowid);
+    res.status(201).json(row);
+  } catch (err) {
+    console.error("Error adding tire expense:", err);
+    res.status(500).json({ error: "تۆمارکردنی مسروف سەرنەکەوت" });
+  }
+});
+
+app.delete("/api/tire-expenses/:id", adminOrTire, (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    const info = db.prepare("DELETE FROM tire_expenses WHERE id = ?").run(id);
+    if (info.changes === 0) return res.status(404).json({ error: "مسروفەکە نەدۆزرایەوە" });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error deleting tire expense:", err);
+    res.status(500).json({ error: "سڕینەوەی مسروف سەرنەکەوت" });
+  }
 });
 
 
