@@ -172,6 +172,55 @@ tr.row-focus {
   background: rgba(59, 130, 246, 0.12);
 }
 
+tr.row-editing {
+  background: rgba(59, 130, 246, 0.06);
+  border: 2px solid var(--accent);
+}
+
+tr.row-editing td {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+
+tr.row-editing input {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.45rem;
+}
+
+button.primary.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  padding: 0.4rem 0.35rem;
+  min-height: 2.25rem;
+  transition: color 0.15s;
+}
+
+button.primary.link:hover {
+  color: var(--accent-hover);
+}
+
+button.ghost.link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  padding: 0.4rem 0.35rem;
+  min-height: 2.25rem;
+  transition: color 0.15s;
+}
+
+button.ghost.link:hover {
+  color: var(--text);
+}
+
 .card-nested {
   margin-top: 1.25rem;
   padding: 1rem 1.1rem;

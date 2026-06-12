@@ -212,6 +212,8 @@ export default function App() {
   const [debtorsFocusId, setDebtorsFocusId] = useState("");
   const [debtorsFocusDetail, setDebtorsFocusDetail] = useState(null);
   const [debtorSearch, setDebtorSearch] = useState("");
+  const [editingDebtorId, setEditingDebtorId] = useState(null);
+  const [editDebtorForm, setEditDebtorForm] = useState({ name: "", phone: "", note: "" });
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [txnForm, setTxnForm] = useState({
@@ -256,6 +258,8 @@ export default function App() {
   const [tireCustomerForm, setTireCustomerForm] = useState({ name: "", phone: "", note: "", initial_balance_usd: "" });
   const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
   const [tireCustomerSearch, setTireCustomerSearch] = useState("");
+  const [editingTireCustomerId, setEditingTireCustomerId] = useState(null);
+  const [editTireCustomerForm, setEditTireCustomerForm] = useState({ name: "", phone: "", note: "" });
   
   const [tireSales, setTireSales] = useState([]);
   const [tireSaleSearch, setTireSaleSearch] = useState("");
@@ -797,6 +801,43 @@ export default function App() {
     if (r.ok) setDebtorsFocusDetail(await r.json());
   }
 
+  function startEditDebtor(d) {
+    setEditingDebtorId(d.id);
+    setEditDebtorForm({ name: d.name, phone: d.phone || "", note: d.note || "" });
+  }
+
+  function cancelEditDebtor() {
+    setEditingDebtorId(null);
+    setEditDebtorForm({ name: "", phone: "", note: "" });
+  }
+
+  async function saveEditDebtor(id) {
+    setErr("");
+    setInfoMsg("");
+    try {
+      const r = await fetch(`${API}/debtors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editDebtorForm),
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      setEditingDebtorId(null);
+      setEditDebtorForm({ name: "", phone: "", note: "" });
+      await refreshDebtors();
+      if (debtorsFocusId && String(debtorsFocusId) === String(id)) {
+        await refreshDebtorFocusSummary();
+      }
+      setInfoMsg("زانیاری قەرزدار نوێکرایەوە.");
+      window.setTimeout(() => setInfoMsg(""), 4000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex) || "پەیوەندی سێرڤەر سەرکەوتوو نەبوو.");
+    }
+  }
+
   /* ───────── Transaction actions ───────── */
 
   async function submitTxn(e) {
@@ -995,6 +1036,60 @@ export default function App() {
       setShowAddCustomerForm(false);
       await loadTireCustomers();
       setInfoMsg("قەرزداری تایە بە سەرکەوتوویی زیادکرا.");
+      window.setTimeout(() => setInfoMsg(""), 3000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
+
+  function startEditTireCustomer(c) {
+    setEditingTireCustomerId(c.id);
+    setEditTireCustomerForm({ name: c.name, phone: c.phone || "", note: c.note || "" });
+  }
+
+  function cancelEditTireCustomer() {
+    setEditingTireCustomerId(null);
+    setEditTireCustomerForm({ name: "", phone: "", note: "" });
+  }
+
+  async function saveEditTireCustomer(id) {
+    setErr("");
+    setInfoMsg("");
+    try {
+      const r = await fetch(`${API}/tire-customers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editTireCustomerForm),
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      setEditingTireCustomerId(null);
+      setEditTireCustomerForm({ name: "", phone: "", note: "" });
+      await loadTireCustomers();
+      setInfoMsg("زانیاری قەرزداری تایە نوێکرایەوە.");
+      window.setTimeout(() => setInfoMsg(""), 4000);
+    } catch (ex) {
+      setErr(String(ex?.message || ex) || "پەیوەندی سێرڤەر سەرکەوتوو نەبوو.");
+    }
+  }
+
+  async function removeTireCustomer(id) {
+    if (!confirm("سڕینەوەی ئەم قەرزدارەی تایە و هەموو واسڵکردنەکانی؟")) return;
+    setErr("");
+    setInfoMsg("");
+    try {
+      const r = await fetch(`${API}/tire-customers/${id}`, { method: "DELETE" });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(humanApiFailure(r.status, raw));
+        return;
+      }
+      if (String(focusedTireCustomerId) === String(id)) setFocusedTireCustomerId("");
+      await loadTireCustomers();
+      setInfoMsg("قەرزداری تایە سڕایەوە.");
       window.setTimeout(() => setInfoMsg(""), 3000);
     } catch (ex) {
       setErr(String(ex?.message || ex));
@@ -1576,26 +1671,73 @@ export default function App() {
                 </thead>
                 <tbody>
                   {filteredDebtors.map((d) => (
-                    <tr key={d.id} className={String(debtorsFocusId) === String(d.id) ? "row-focus" : ""}>
-                      <td>
-                        <button
-                          type="button"
-                          className="name-link"
-                          onClick={() => setDebtorsFocusId(String(d.id))}
-                        >
-                          {d.name}
-                        </button>
-                      </td>
-                      <td>{d.phone}</td>
-                      <td className="num debt" style={{ fontWeight: "600" }}>{d.balance_usd ? fmtMoney(d.balance_usd, "usd") : "0 $"}</td>
-                      <td className="num debt" style={{ fontWeight: "600" }}>{d.balance_iqd ? fmtMoney(d.balance_iqd, "iqd") : "0 د.ع"}</td>
-                      <td className="muted">{d.note}</td>
-                      <td>
-                        <button type="button" className="danger link" onClick={() => removeDebtor(d.id)}>
-                          سڕینەوە
-                        </button>
-                      </td>
-                    </tr>
+                    editingDebtorId === d.id ? (
+                      <tr key={d.id} className="row-editing">
+                        <td>
+                          <input
+                            value={editDebtorForm.name}
+                            onChange={(e) => setEditDebtorForm({ ...editDebtorForm, name: e.target.value })}
+                            placeholder="ناو"
+                            style={{ width: "100%", minWidth: "100px" }}
+                            autoFocus
+                          />
+                        </td>
+                        <td>
+                          <input
+                            value={editDebtorForm.phone}
+                            onChange={(e) => setEditDebtorForm({ ...editDebtorForm, phone: e.target.value })}
+                            placeholder="مۆبایل"
+                            style={{ width: "100%", minWidth: "90px" }}
+                          />
+                        </td>
+                        <td className="num debt" style={{ fontWeight: "600" }}>{d.balance_usd ? fmtMoney(d.balance_usd, "usd") : "0 $"}</td>
+                        <td className="num debt" style={{ fontWeight: "600" }}>{d.balance_iqd ? fmtMoney(d.balance_iqd, "iqd") : "0 د.ع"}</td>
+                        <td>
+                          <input
+                            value={editDebtorForm.note}
+                            onChange={(e) => setEditDebtorForm({ ...editDebtorForm, note: e.target.value })}
+                            placeholder="تێبینی"
+                            style={{ width: "100%", minWidth: "100px" }}
+                          />
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap" }}>
+                            <button type="button" className="primary link" onClick={() => saveEditDebtor(d.id)} style={{ whiteSpace: "nowrap" }}>
+                              پاشەکەوت
+                            </button>
+                            <button type="button" className="ghost link" onClick={cancelEditDebtor} style={{ whiteSpace: "nowrap" }}>
+                              پاشگەزبوونەوە
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={d.id} className={String(debtorsFocusId) === String(d.id) ? "row-focus" : ""}>
+                        <td>
+                          <button
+                            type="button"
+                            className="name-link"
+                            onClick={() => setDebtorsFocusId(String(d.id))}
+                          >
+                            {d.name}
+                          </button>
+                        </td>
+                        <td>{d.phone}</td>
+                        <td className="num debt" style={{ fontWeight: "600" }}>{d.balance_usd ? fmtMoney(d.balance_usd, "usd") : "0 $"}</td>
+                        <td className="num debt" style={{ fontWeight: "600" }}>{d.balance_iqd ? fmtMoney(d.balance_iqd, "iqd") : "0 د.ع"}</td>
+                        <td className="muted">{d.note}</td>
+                        <td>
+                          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap" }}>
+                            <button type="button" className="ghost link" onClick={() => startEditDebtor(d)} style={{ whiteSpace: "nowrap" }}>
+                              دەستکاری
+                            </button>
+                            <button type="button" className="danger link" onClick={() => removeDebtor(d.id)} style={{ whiteSpace: "nowrap" }}>
+                              سڕینەوە
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
                   ))}
                   {filteredDebtors.length === 0 ? (
                     <tr>
@@ -2909,24 +3051,76 @@ export default function App() {
                       <th>مۆبایل</th>
                       <th>ماوەی قەرز ($)</th>
                       <th>تێبینی</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredTireCustomers.map((c) => (
-                      <tr key={c.id} className={String(focusedTireCustomerId) === String(c.id) ? "row-focus" : ""}>
-                        <td>
-                          <button type="button" className="name-link" onClick={() => setFocusedTireCustomerId(String(c.id))}>
-                            {c.name}
-                          </button>
-                        </td>
-                        <td>{c.phone}</td>
-                        <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(c.balance_usd, "usd")}</td>
-                        <td className="muted">{c.note}</td>
-                      </tr>
+                      editingTireCustomerId === c.id ? (
+                        <tr key={c.id} className="row-editing">
+                          <td>
+                            <input
+                              value={editTireCustomerForm.name}
+                              onChange={(e) => setEditTireCustomerForm({ ...editTireCustomerForm, name: e.target.value })}
+                              placeholder="ناو"
+                              style={{ width: "100%", minWidth: "100px" }}
+                              autoFocus
+                            />
+                          </td>
+                          <td>
+                            <input
+                              value={editTireCustomerForm.phone}
+                              onChange={(e) => setEditTireCustomerForm({ ...editTireCustomerForm, phone: e.target.value })}
+                              placeholder="مۆبایل"
+                              style={{ width: "100%", minWidth: "90px" }}
+                            />
+                          </td>
+                          <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(c.balance_usd, "usd")}</td>
+                          <td>
+                            <input
+                              value={editTireCustomerForm.note}
+                              onChange={(e) => setEditTireCustomerForm({ ...editTireCustomerForm, note: e.target.value })}
+                              placeholder="تێبینی"
+                              style={{ width: "100%", minWidth: "100px" }}
+                            />
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap" }}>
+                              <button type="button" className="primary link" onClick={() => saveEditTireCustomer(c.id)} style={{ whiteSpace: "nowrap" }}>
+                                پاشەکەوت
+                              </button>
+                              <button type="button" className="ghost link" onClick={cancelEditTireCustomer} style={{ whiteSpace: "nowrap" }}>
+                                پاشگەزبوونەوە
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={c.id} className={String(focusedTireCustomerId) === String(c.id) ? "row-focus" : ""}>
+                          <td>
+                            <button type="button" className="name-link" onClick={() => setFocusedTireCustomerId(String(c.id))}>
+                              {c.name}
+                            </button>
+                          </td>
+                          <td>{c.phone}</td>
+                          <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(c.balance_usd, "usd")}</td>
+                          <td className="muted">{c.note}</td>
+                          <td>
+                            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap" }}>
+                              <button type="button" className="ghost link" onClick={() => startEditTireCustomer(c)} style={{ whiteSpace: "nowrap" }}>
+                                دەستکاری
+                              </button>
+                              <button type="button" className="danger link" onClick={() => removeTireCustomer(c.id)} style={{ whiteSpace: "nowrap" }}>
+                                سڕینەوە
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
                     ))}
                     {filteredTireCustomers.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
+                        <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "2rem" }}>
                           هیچ قەرزدارێکی تایە نەدۆزرایەوە.
                         </td>
                       </tr>

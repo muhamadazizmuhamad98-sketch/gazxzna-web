@@ -782,6 +782,43 @@ app.post("/api/tire-customers", adminOrTire, (req, res) => {
   }
 });
 
+app.patch("/api/tire-customers/:id", adminOrTire, (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM tire_customers WHERE id = ?").get(id);
+  if (!cur) return res.status(404).json({ error: "نەدۆزرایەوە" });
+  const name = req.body?.name != null ? String(req.body.name).trim() : cur.name;
+  const phone = req.body?.phone != null ? String(req.body.phone).trim() : cur.phone;
+  const note = req.body?.note != null ? String(req.body.note).trim() : cur.note;
+  const initial_balance_usd = req.body?.initial_balance_usd != null ? Number(req.body.initial_balance_usd) : cur.initial_balance_usd;
+  if (!name) return res.status(400).json({ error: "ناو پێویستە" });
+  try {
+    db.prepare("UPDATE tire_customers SET name = ?, phone = ?, note = ?, initial_balance_usd = ? WHERE id = ?").run(
+      name, phone, note, initial_balance_usd, id
+    );
+    const r = db.prepare("SELECT * FROM tire_customers WHERE id = ?").get(id);
+    res.json(rowTireCustomer(r));
+  } catch (e) {
+    if (String(e.message).includes("UNIQUE")) {
+      return res.status(409).json({ error: "ئەم ناوە پێشتر هەیە" });
+    }
+    throw e;
+  }
+});
+
+app.delete("/api/tire-customers/:id", adminOrTire, (req, res) => {
+  const id = Number(req.params.id);
+  // Check for existing sales linked to this customer
+  const salesCount = db.prepare("SELECT COUNT(*) AS cnt FROM tire_sales WHERE customer_id = ?").get(id);
+  if (salesCount && salesCount.cnt > 0) {
+    return res.status(400).json({ error: "ناتوانیت ئەم قەرزدارە بسڕیتەوە چونکە فرۆشتنی پەیوەست بەوەوە هەیە. سەرەتا فرۆشتنەکانی بسڕەوە." });
+  }
+  // Delete payments
+  db.prepare("DELETE FROM tire_payments WHERE customer_id = ?").run(id);
+  const info = db.prepare("DELETE FROM tire_customers WHERE id = ?").run(id);
+  if (info.changes === 0) return res.status(404).json({ error: "نەدۆزرایەوە" });
+  res.json({ ok: true });
+});
+
 // 3. Sales Endpoints
 app.get("/api/tire-sales", adminOrTire, (_req, res) => {
   const rows = db.prepare(`
