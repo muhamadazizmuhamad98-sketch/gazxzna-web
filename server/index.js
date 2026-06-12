@@ -3,6 +3,8 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const { db } = require("./db");
 
 function loadRootEnv() {
@@ -79,6 +81,21 @@ function getAllUsers() {
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+
+// ─── پاراستنی هێدەرەکانی سێرڤەر (Helmet Security) ───
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
+
+// ─── سنووردارکردنی ژمارەی داواکارییەکان (Rate Limiting) ───
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // ١٥ خولەک
+  max: 400, // هەر ئایپییەک زۆرترین ٤٠٠ داواکاری بنێرێت لە ماوەی ١٥ خولەکدا
+  message: { error: "داواکارییەکانت زۆر بوون، تکایە کەمێکی تر تاقی بکەرەوە (١٥ خولەک چاوەڕێ بکە)" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/", limiter);
 
 /* ═══════ Auth Endpoints ═══════ */
 
