@@ -259,7 +259,7 @@ export default function App() {
   const [showAddCustomerForm, setShowAddCustomerForm] = useState(false);
   const [tireCustomerSearch, setTireCustomerSearch] = useState("");
   const [editingTireCustomerId, setEditingTireCustomerId] = useState(null);
-  const [editTireCustomerForm, setEditTireCustomerForm] = useState({ name: "", phone: "", note: "" });
+  const [editTireCustomerForm, setEditTireCustomerForm] = useState({ name: "", phone: "", note: "", initial_balance_usd: "" });
   
   const [tireSales, setTireSales] = useState([]);
   const [tireSaleSearch, setTireSaleSearch] = useState("");
@@ -1044,12 +1044,17 @@ export default function App() {
 
   function startEditTireCustomer(c) {
     setEditingTireCustomerId(c.id);
-    setEditTireCustomerForm({ name: c.name, phone: c.phone || "", note: c.note || "" });
+    setEditTireCustomerForm({
+      name: c.name,
+      phone: c.phone || "",
+      note: c.note || "",
+      initial_balance_usd: c.initial_balance_usd ?? 0
+    });
   }
 
   function cancelEditTireCustomer() {
     setEditingTireCustomerId(null);
-    setEditTireCustomerForm({ name: "", phone: "", note: "" });
+    setEditTireCustomerForm({ name: "", phone: "", note: "", initial_balance_usd: "" });
   }
 
   async function saveEditTireCustomer(id) {
@@ -1067,7 +1072,7 @@ export default function App() {
         return;
       }
       setEditingTireCustomerId(null);
-      setEditTireCustomerForm({ name: "", phone: "", note: "" });
+      setEditTireCustomerForm({ name: "", phone: "", note: "", initial_balance_usd: "" });
       await loadTireCustomers();
       setInfoMsg("زانیاری قەرزداری تایە نوێکرایەوە.");
       window.setTimeout(() => setInfoMsg(""), 4000);
@@ -3075,7 +3080,16 @@ export default function App() {
                               style={{ width: "100%", minWidth: "90px" }}
                             />
                           </td>
-                          <td className="num debt" style={{ fontWeight: "700" }}>{fmtMoney(c.balance_usd, "usd")}</td>
+                          <td>
+                            <input
+                              type="number"
+                              step="any"
+                              value={editTireCustomerForm.initial_balance_usd}
+                              onChange={(e) => setEditTireCustomerForm({ ...editTireCustomerForm, initial_balance_usd: e.target.value })}
+                              placeholder="قەرزی سەرەتایی"
+                              style={{ width: "100%", minWidth: "90px" }}
+                            />
+                          </td>
                           <td>
                             <input
                               value={editTireCustomerForm.note}
