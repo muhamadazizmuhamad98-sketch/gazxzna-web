@@ -159,6 +159,24 @@ const IconUsers = () => (
     <path d="M21 12h-3m0 0h-3m3 0V9m0 3v3" />
   </svg>
 );
+const IconExport = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M12 19V5m0 0l-7 7m7-7l7 7" />
+    <path d="M5 21h14" />
+  </svg>
+);
+const IconStorage = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7" />
+    <ellipse cx="12" cy="7" rx="8" ry="4" />
+    <path d="M4 12c0 2.21 3.582 4 8 4s8-1.79 8-4" />
+  </svg>
+);
+const IconExportReport = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
 
 // Intercept fetch to add authorization token and catch 401s
 const originalFetch = window.fetch;
@@ -305,6 +323,31 @@ export default function App() {
   const [tireExpFilterFrom, setTireExpFilterFrom] = useState("");
   const [tireExpFilterTo, setTireExpFilterTo] = useState("");
   const [tireExpensesLoading, setTireExpensesLoading] = useState(false);
+
+  /* ─── هەناردەی گاز state ─── */
+  const [gasExports, setGasExports] = useState([]);
+  const [gasExportForm, setGasExportForm] = useState({
+    receiver_name: "", quantity_liters: "", cost_price_per_barrel_usd: "", cost_price_per_barrel_iqd: "",
+    status: "لە فرۆشتندایە", sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "",
+    export_date: today, note: ""
+  });
+  const [exportFilterFrom, setExportFilterFrom] = useState("");
+  const [exportFilterTo, setExportFilterTo] = useState("");
+  const [exportFilterStatus, setExportFilterStatus] = useState("");
+  const [exportsLoading, setExportsLoading] = useState(false);
+  const [exportSearch, setExportSearch] = useState("");
+
+  /* ─── حەمباری گاز state ─── */
+  const [gasStorage, setGasStorage] = useState([]);
+  const [gasStorageSummary, setGasStorageSummary] = useState(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+  const [storageSellForm, setStorageSellForm] = useState({ id: null, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" });
+
+  /* ─── ڕاپۆرتی هەناردە state ─── */
+  const [exportReport, setExportReport] = useState(null);
+  const [exportReportFrom, setExportReportFrom] = useState("");
+  const [exportReportTo, setExportReportTo] = useState("");
+  const [exportReportLoading, setExportReportLoading] = useState(false);
   
   const [backupSecret, setBackupSecret] = useState("");
   const [backupErr, setBackupErr] = useState("");
@@ -383,6 +426,51 @@ export default function App() {
       setTireExpensesLoading(false);
     }
   }, [tireExpFilterFrom, tireExpFilterTo, token, user]);
+
+  /* ─── هەناردە API ─── */
+  const loadGasExports = useCallback(async () => {
+    if (!token || !user || user.role === "tire") return;
+    setExportsLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (exportFilterFrom) p.set("from", exportFilterFrom);
+      if (exportFilterTo) p.set("to", exportFilterTo);
+      if (exportFilterStatus) p.set("status", exportFilterStatus);
+      const r = await fetch(`${API}/exports?` + p.toString());
+      if (r.ok) setGasExports(await r.json());
+    } finally {
+      setExportsLoading(false);
+    }
+  }, [exportFilterFrom, exportFilterTo, exportFilterStatus, token, user]);
+
+  const loadGasStorage = useCallback(async () => {
+    if (!token || !user || user.role === "tire") return;
+    setStorageLoading(true);
+    try {
+      const [listRes, summaryRes] = await Promise.all([
+        fetch(`${API}/gas-storage`),
+        fetch(`${API}/gas-storage/summary`)
+      ]);
+      if (listRes.ok) setGasStorage(await listRes.json());
+      if (summaryRes.ok) setGasStorageSummary(await summaryRes.json());
+    } finally {
+      setStorageLoading(false);
+    }
+  }, [token, user]);
+
+  const loadExportReport = useCallback(async () => {
+    if (!token || !user || user.role === "tire") return;
+    setExportReportLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (exportReportFrom) p.set("from", exportReportFrom);
+      if (exportReportTo) p.set("to", exportReportTo);
+      const r = await fetch(`${API}/export-reports/summary?` + p.toString());
+      if (r.ok) setExportReport(await r.json());
+    } finally {
+      setExportReportLoading(false);
+    }
+  }, [exportReportFrom, exportReportTo, token, user]);
 
   const loadDebtors = useCallback(async () => {
     if (!token || !user || user.role === "tire") return;
@@ -749,8 +837,14 @@ export default function App() {
       loadSoldItems();
     } else if (tab === "tire_expenses") {
       loadTireExpenses();
+    } else if (tab === "gas_exports") {
+      loadGasExports();
+    } else if (tab === "gas_storage") {
+      loadGasStorage();
+    } else if (tab === "export_reports") {
+      loadExportReport();
     }
-  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport, loadSoldItems, loadTireExpenses]);
+  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport, loadSoldItems, loadTireExpenses, loadGasExports, loadGasStorage, loadExportReport]);
 
   /* بارکردنی مسروفاتی تایە کاتێک فلتەرەکان دەگۆڕێن */
   useEffect(() => {
@@ -1944,6 +2038,21 @@ export default function App() {
               </button>
               <button type="button" className={tab === "tire_reports" ? "on" : ""} onClick={() => switchTab("tire_reports")}>
                 <IconTireReports /> ڕاپۆرتی تایە
+              </button>
+            </>
+          )}
+
+          {(user.role === "admin" || user.role === "user") && (
+            <>
+              <span className="nav-separator"></span>
+              <button type="button" className={tab === "gas_exports" ? "on" : ""} onClick={() => switchTab("gas_exports")}>
+                <IconExport /> هەناردە
+              </button>
+              <button type="button" className={tab === "gas_storage" ? "on" : ""} onClick={() => switchTab("gas_storage")}>
+                <IconStorage /> حەمباری گاز
+              </button>
+              <button type="button" className={tab === "export_reports" ? "on" : ""} onClick={() => switchTab("export_reports")}>
+                <IconExportReport /> ڕاپۆرتی هەناردە
               </button>
             </>
           )}
@@ -4143,6 +4252,400 @@ export default function App() {
               </section>
             </>
           ) : null}
+        </div>
+      ) : null}
+      {/* ═══════ TAB: هەناردەی گاز ═══════ */}
+      {tab === "gas_exports" ? (
+        <div className="tab-panels">
+          <section className="card" aria-labelledby="export-add-heading">
+            <h2 id="export-add-heading">تۆمارکردنی هەناردەی تازە</h2>
+            <form className="grid-form" onSubmit={async (e) => {
+              e.preventDefault();
+              setErr("");
+              const liters = num(gasExportForm.quantity_liters);
+              if (liters <= 0) { setErr("بڕی لیتر پێویستە"); return; }
+              try {
+                const r = await fetch(`${API}/exports`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    ...gasExportForm,
+                    quantity_liters: liters,
+                    cost_price_per_barrel_usd: num(gasExportForm.cost_price_per_barrel_usd),
+                    cost_price_per_barrel_iqd: num(gasExportForm.cost_price_per_barrel_iqd),
+                    sell_price_per_barrel_usd: num(gasExportForm.sell_price_per_barrel_usd),
+                    sell_price_per_barrel_iqd: num(gasExportForm.sell_price_per_barrel_iqd),
+                  }),
+                });
+                const raw = await r.text();
+                if (!r.ok) { setErr(parseJsonFromText(raw)?.error || "هەڵەیەک ڕوویدا"); return; }
+                setGasExportForm({
+                  receiver_name: "", quantity_liters: "", cost_price_per_barrel_usd: "", cost_price_per_barrel_iqd: "",
+                  status: "لە فرۆشتندایە", sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "",
+                  export_date: today, note: ""
+                });
+                setInfoMsg("هەناردە بە سەرکەوتوویی تۆمار کرا ✅");
+                setTimeout(() => setInfoMsg(""), 3000);
+                loadGasExports();
+              } catch (ex) { setErr(String(ex?.message || ex)); }
+            }}>
+              <label>
+                ناوی وەرگر
+                <input value={gasExportForm.receiver_name} onChange={e => setGasExportForm(f => ({ ...f, receiver_name: e.target.value }))} placeholder="ناوی وەرگر" required />
+              </label>
+              <label>
+                بڕ بە لیتر
+                <input type="number" value={gasExportForm.quantity_liters} onChange={e => setGasExportForm(f => ({ ...f, quantity_liters: e.target.value }))} placeholder="20000" min="1" required />
+              </label>
+              <label>
+                بەرمیل (ئۆتۆماتیک ÷ ٢٢٠)
+                <input type="text" readOnly value={num(gasExportForm.quantity_liters) > 0 ? (num(gasExportForm.quantity_liters) / 220).toFixed(2) : "—"} className="computed-field" />
+              </label>
+              <label>
+                نرخی کڕین / بەرمیل ($)
+                <input type="number" step="any" value={gasExportForm.cost_price_per_barrel_usd} onChange={e => setGasExportForm(f => ({ ...f, cost_price_per_barrel_usd: e.target.value }))} placeholder="0" />
+              </label>
+              <label>
+                نرخی کڕین / بەرمیل (د.ع)
+                <input type="number" step="any" value={gasExportForm.cost_price_per_barrel_iqd} onChange={e => setGasExportForm(f => ({ ...f, cost_price_per_barrel_iqd: e.target.value }))} placeholder="0" />
+              </label>
+              <label>
+                ڕێکەوت
+                <input type="date" value={gasExportForm.export_date} onChange={e => setGasExportForm(f => ({ ...f, export_date: e.target.value }))} required />
+              </label>
+              <label>
+                بارودۆخ
+                <select value={gasExportForm.status} onChange={e => setGasExportForm(f => ({ ...f, status: e.target.value }))}>
+                  <option value="فرۆشرا">فرۆشرا</option>
+                  <option value="لە فرۆشتندایە">لە فرۆشتندایە</option>
+                  <option value="حەمبار کراوە">حەمبار کراوە</option>
+                </select>
+              </label>
+              {gasExportForm.status === "فرۆشرا" && (
+                <>
+                  <label>
+                    نرخی فرۆشتن / بەرمیل ($)
+                    <input type="number" step="any" value={gasExportForm.sell_price_per_barrel_usd} onChange={e => setGasExportForm(f => ({ ...f, sell_price_per_barrel_usd: e.target.value }))} placeholder="0" />
+                  </label>
+                  <label>
+                    نرخی فرۆشتن / بەرمیل (د.ع)
+                    <input type="number" step="any" value={gasExportForm.sell_price_per_barrel_iqd} onChange={e => setGasExportForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} placeholder="0" />
+                  </label>
+                </>
+              )}
+              {gasExportForm.status === "فرۆشرا" && num(gasExportForm.quantity_liters) > 0 && (num(gasExportForm.sell_price_per_barrel_usd) > 0 || num(gasExportForm.sell_price_per_barrel_iqd) > 0) && (
+                <div className="profit-preview span2">
+                  <strong>پێشبینی قازانج:</strong>
+                  {num(gasExportForm.sell_price_per_barrel_usd) > 0 && (
+                    <span> {fmtMoney(((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.sell_price_per_barrel_usd)) - ((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.cost_price_per_barrel_usd)), "usd")}</span>
+                  )}
+                  {num(gasExportForm.sell_price_per_barrel_iqd) > 0 && (
+                    <span> | {fmtMoney(((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.sell_price_per_barrel_iqd)) - ((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.cost_price_per_barrel_iqd)), "iqd")}</span>
+                  )}
+                </div>
+              )}
+              <label className="span2">
+                تێبینی
+                <input value={gasExportForm.note} onChange={e => setGasExportForm(f => ({ ...f, note: e.target.value }))} placeholder="تێبینی (ئارەزوومەندانە)" />
+              </label>
+              <button type="submit" className="primary span2">تۆمارکردن</button>
+            </form>
+          </section>
+
+          <section className="card" aria-labelledby="export-list-heading">
+            <div className="section-head">
+              <h2 id="export-list-heading">لیستی هەناردەکان</h2>
+              <div className="filter-row">
+                <input type="text" placeholder="گەڕان بە ناو..." value={exportSearch} onChange={e => setExportSearch(e.target.value)} style={{ maxWidth: 200 }} />
+                <select value={exportFilterStatus} onChange={e => { setExportFilterStatus(e.target.value); }} style={{ maxWidth: 160 }}>
+                  <option value="">هەموو بارودۆخەکان</option>
+                  <option value="فرۆشرا">فرۆشرا</option>
+                  <option value="لە فرۆشتندایە">لە فرۆشتندایە</option>
+                  <option value="حەمبار کراوە">حەمبار کراوە</option>
+                </select>
+                <label>لە <input type="date" value={exportFilterFrom} onChange={e => setExportFilterFrom(e.target.value)} /></label>
+                <label>بۆ <input type="date" value={exportFilterTo} onChange={e => setExportFilterTo(e.target.value)} /></label>
+                <button type="button" onClick={() => { setExportFilterFrom(""); setExportFilterTo(""); setExportFilterStatus(""); setExportSearch(""); }}>سڕینەوەی فلتەر</button>
+              </div>
+            </div>
+            {exportsLoading ? <p className="muted">بارکردن...</p> : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th><th>وەرگر</th><th>لیتر</th><th>بەرمیل</th>
+                      <th>نرخی کڕین ($)</th><th>نرخی کڕین (د.ع)</th>
+                      <th>بارودۆخ</th>
+                      <th>نرخی فرۆشتن ($)</th><th>نرخی فرۆشتن (د.ع)</th>
+                      <th>قازانج ($)</th><th>قازانج (د.ع)</th>
+                      <th>ڕێکەوت</th><th>تێبینی</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gasExports
+                      .filter(e => !exportSearch || e.receiver_name?.toLowerCase().includes(exportSearch.toLowerCase()))
+                      .map((ex, i) => (
+                      <tr key={ex.id}>
+                        <td>{i + 1}</td>
+                        <td><strong>{ex.receiver_name}</strong></td>
+                        <td>{Number(ex.quantity_liters).toLocaleString()}</td>
+                        <td>{Number(ex.barrels).toFixed(2)}</td>
+                        <td>{fmtMoney(ex.cost_price_per_barrel_usd, "usd")}</td>
+                        <td>{ex.cost_price_per_barrel_iqd > 0 ? fmtMoney(ex.cost_price_per_barrel_iqd, "iqd") : "—"}</td>
+                        <td>
+                          <span className={`export-status status-${ex.status === "فرۆشرا" ? "sold" : ex.status === "لە فرۆشتندایە" ? "progress" : "stored"}`}>
+                            {ex.status}
+                          </span>
+                        </td>
+                        <td>{ex.status === "فرۆشرا" ? fmtMoney(ex.sell_price_per_barrel_usd, "usd") : "—"}</td>
+                        <td>{ex.status === "فرۆشرا" && ex.sell_price_per_barrel_iqd > 0 ? fmtMoney(ex.sell_price_per_barrel_iqd, "iqd") : "—"}</td>
+                        <td>{ex.status === "فرۆشرا" ? <span className={ex.total_profit_usd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(ex.total_profit_usd, "usd")}</span> : "—"}</td>
+                        <td>{ex.status === "فرۆشرا" && ex.total_profit_iqd !== 0 ? <span className={ex.total_profit_iqd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(ex.total_profit_iqd, "iqd")}</span> : "—"}</td>
+                        <td>{ex.export_date}</td>
+                        <td className="muted" style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{ex.note || ""}</td>
+                        <td>
+                          <button type="button" className="danger link" onClick={async () => {
+                            if (!confirm("ئایا دڵنیایت لە سڕینەوەی ئەم هەناردەیە؟")) return;
+                            const r = await fetch(`${API}/exports/${ex.id}`, { method: "DELETE" });
+                            if (r.ok) loadGasExports();
+                            else setErr("سڕینەوە سەرنەکەوت");
+                          }}>سڕینەوە</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {gasExports.length === 0 && (
+                      <tr><td colSpan={14} className="muted" style={{ textAlign: "center", padding: "2rem" }}>هیچ هەناردەیەک نەدۆزرایەوە.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: حەمباری گاز ═══════ */}
+      {tab === "gas_storage" ? (
+        <div className="tab-panels">
+          {gasStorageSummary && (
+            <div className="summary-cards export-summary">
+              <div className="s-card s-card-blue">
+                <span className="s-label">ئامانجی بەردەست</span>
+                <span className="s-val">{Number(gasStorageSummary.total_barrels).toFixed(2)} بەرمیل</span>
+                <span className="s-sub">{Number(gasStorageSummary.total_liters).toLocaleString()} لیتر</span>
+              </div>
+              <div className="s-card s-card-amber">
+                <span className="s-label">نرخی مخزن ($)</span>
+                <span className="s-val">{fmtMoney(gasStorageSummary.total_cost_usd, "usd")}</span>
+                {gasStorageSummary.total_cost_iqd > 0 && <span className="s-sub">{fmtMoney(gasStorageSummary.total_cost_iqd, "iqd")}</span>}
+              </div>
+              <div className="s-card s-card-green">
+                <span className="s-label">قازانجی فرۆشراو ($)</span>
+                <span className="s-val">{fmtMoney(gasStorageSummary.sold_profit_usd, "usd")}</span>
+                {gasStorageSummary.sold_profit_iqd !== 0 && <span className="s-sub">{fmtMoney(gasStorageSummary.sold_profit_iqd, "iqd")}</span>}
+              </div>
+              <div className="s-card">
+                <span className="s-label">ئامانج / فرۆشراو</span>
+                <span className="s-val">{gasStorageSummary.available_count} / {gasStorageSummary.sold_count}</span>
+              </div>
+            </div>
+          )}
+          <section className="card" aria-labelledby="storage-heading">
+            <h2 id="storage-heading">حەمباری گاز</h2>
+            {storageLoading ? <p className="muted">بارکردن...</p> : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th><th>وەرگر</th><th>لیتر</th><th>بەرمیل</th>
+                      <th>نرخی کڕین ($)</th><th>نرخی کڕین (د.ع)</th>
+                      <th>بارودۆخ</th>
+                      <th>نرخی فرۆشتن ($)</th><th>نرخی فرۆشتن (د.ع)</th>
+                      <th>قازانج ($)</th><th>قازانج (د.ع)</th>
+                      <th>کاری حەمبار</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gasStorage.map((s, i) => (
+                      <tr key={s.id}>
+                        <td>{i + 1}</td>
+                        <td><strong>{s.receiver_name}</strong></td>
+                        <td>{Number(s.quantity_liters).toLocaleString()}</td>
+                        <td>{Number(s.barrels).toFixed(2)}</td>
+                        <td>{fmtMoney(s.cost_price_per_barrel_usd, "usd")}</td>
+                        <td>{s.cost_price_per_barrel_iqd > 0 ? fmtMoney(s.cost_price_per_barrel_iqd, "iqd") : "—"}</td>
+                        <td>
+                          <span className={`export-status status-${s.status === "فرۆشرا" ? "sold" : "stored"}`}>
+                            {s.status}
+                          </span>
+                        </td>
+                        <td>{s.status === "فرۆشرا" ? fmtMoney(s.sell_price_per_barrel_usd, "usd") : "—"}</td>
+                        <td>{s.status === "فرۆشرا" && s.sell_price_per_barrel_iqd > 0 ? fmtMoney(s.sell_price_per_barrel_iqd, "iqd") : "—"}</td>
+                        <td>{s.status === "فرۆشرا" ? <span className={s.total_profit_usd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(s.total_profit_usd, "usd")}</span> : "—"}</td>
+                        <td>{s.status === "فرۆشرا" && s.total_profit_iqd !== 0 ? <span className={s.total_profit_iqd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(s.total_profit_iqd, "iqd")}</span> : "—"}</td>
+                        <td>
+                          {s.status === "هەمبار" ? (
+                            storageSellForm.id === s.id ? (
+                              <div className="inline-sell-form">
+                                <input type="number" step="any" placeholder="نرخی فرۆشتن ($)" value={storageSellForm.sell_price_per_barrel_usd} onChange={e => setStorageSellForm(f => ({ ...f, sell_price_per_barrel_usd: e.target.value }))} style={{ width: 100 }} />
+                                <input type="number" step="any" placeholder="نرخی فرۆشتن (د.ع)" value={storageSellForm.sell_price_per_barrel_iqd} onChange={e => setStorageSellForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} style={{ width: 100 }} />
+                                <button type="button" className="primary" onClick={async () => {
+                                  setErr("");
+                                  if (num(storageSellForm.sell_price_per_barrel_usd) <= 0 && num(storageSellForm.sell_price_per_barrel_iqd) <= 0) {
+                                    setErr("نرخی فرۆشتن پێویستە"); return;
+                                  }
+                                  const r = await fetch(`${API}/gas-storage/${s.id}/sell`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      sell_price_per_barrel_usd: num(storageSellForm.sell_price_per_barrel_usd),
+                                      sell_price_per_barrel_iqd: num(storageSellForm.sell_price_per_barrel_iqd),
+                                    }),
+                                  });
+                                  if (r.ok) {
+                                    setStorageSellForm({ id: null, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" });
+                                    setInfoMsg("بە سەرکەوتوویی فرۆشرا لە حەمبارەوە ✅");
+                                    setTimeout(() => setInfoMsg(""), 3000);
+                                    loadGasStorage();
+                                  } else {
+                                    const raw = await r.text();
+                                    setErr(parseJsonFromText(raw)?.error || "فرۆشتن سەرنەکەوت");
+                                  }
+                                }}>فرۆشتن</button>
+                                <button type="button" onClick={() => setStorageSellForm({ id: null, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" })}>پاشگەزبوونەوە</button>
+                              </div>
+                            ) : (
+                              <button type="button" className="primary" onClick={() => setStorageSellForm({ id: s.id, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" })}>
+                                فرۆشتن لە حەمبارەوە
+                              </button>
+                            )
+                          ) : (
+                            <span className="muted" style={{ fontSize: "0.8rem" }}>فرۆشراوە</span>
+                          )}
+                        </td>
+                        <td>{s.sold_at ? s.sold_at.slice(0, 10) : ""}</td>
+                      </tr>
+                    ))}
+                    {gasStorage.length === 0 && (
+                      <tr><td colSpan={13} className="muted" style={{ textAlign: "center", padding: "2rem" }}>حەمبار بەتاڵە — هیچ تۆمارێک نییە.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
+
+      {/* ═══════ TAB: ڕاپۆرتی هەناردە ═══════ */}
+      {tab === "export_reports" ? (
+        <div className="tab-panels">
+          <section className="card" aria-labelledby="export-report-heading">
+            <div className="section-head">
+              <h2 id="export-report-heading">ڕاپۆرتی هەناردە</h2>
+              <div className="filter-row">
+                <label>لە <input type="date" value={exportReportFrom} onChange={e => setExportReportFrom(e.target.value)} /></label>
+                <label>بۆ <input type="date" value={exportReportTo} onChange={e => setExportReportTo(e.target.value)} /></label>
+                <button type="button" onClick={() => { setExportReportFrom(""); setExportReportTo(""); }}>سڕینەوەی فلتەر</button>
+              </div>
+            </div>
+            {exportReportLoading ? <p className="muted">بارکردن...</p> : exportReport && (
+              <>
+                <div className="summary-cards export-summary">
+                  <div className="s-card s-card-blue">
+                    <span className="s-label">کۆی هەناردەکان</span>
+                    <span className="s-val">{exportReport.total_count}</span>
+                    <span className="s-sub">{Number(exportReport.total_barrels).toFixed(1)} بەرمیل | {Number(exportReport.total_liters).toLocaleString()} لیتر</span>
+                  </div>
+                  <div className="s-card s-card-green">
+                    <span className="s-label">کۆی قازانج (هەناردە)</span>
+                    <span className="s-val">{fmtMoney(exportReport.total_profit_usd, "usd")}</span>
+                    {exportReport.total_profit_iqd !== 0 && <span className="s-sub">{fmtMoney(exportReport.total_profit_iqd, "iqd")}</span>}
+                  </div>
+                  <div className="s-card s-card-teal">
+                    <span className="s-label">قازانجی حەمبار</span>
+                    <span className="s-val">{fmtMoney(exportReport.storage_profit_usd, "usd")}</span>
+                    {exportReport.storage_profit_iqd !== 0 && <span className="s-sub">{fmtMoney(exportReport.storage_profit_iqd, "iqd")}</span>}
+                  </div>
+                  <div className="s-card s-card-purple">
+                    <span className="s-label">کۆی گشتی قازانج</span>
+                    <span className="s-val">{fmtMoney(exportReport.grand_total_profit_usd, "usd")}</span>
+                    {exportReport.grand_total_profit_iqd !== 0 && <span className="s-sub">{fmtMoney(exportReport.grand_total_profit_iqd, "iqd")}</span>}
+                  </div>
+                </div>
+
+                <div className="summary-cards export-summary" style={{ marginTop: "1rem" }}>
+                  <div className="s-card">
+                    <span className="s-label">فرۆشراو</span>
+                    <span className="s-val">{exportReport.sold_count}</span>
+                  </div>
+                  <div className="s-card">
+                    <span className="s-label">لە فرۆشتندایە</span>
+                    <span className="s-val">{exportReport.in_progress_count}</span>
+                  </div>
+                  <div className="s-card">
+                    <span className="s-label">حەمبار کراوە</span>
+                    <span className="s-val">{exportReport.stored_count}</span>
+                  </div>
+                  <div className="s-card s-card-amber">
+                    <span className="s-label">ئامانجی بەردەست لە حەمبار</span>
+                    <span className="s-val">{Number(exportReport.available_barrels).toFixed(1)} بەرمیل</span>
+                    <span className="s-sub">{fmtMoney(exportReport.available_cost_usd, "usd")}</span>
+                  </div>
+                </div>
+
+                <div className="summary-cards export-summary" style={{ marginTop: "1rem" }}>
+                  <div className="s-card">
+                    <span className="s-label">کۆی تێچوو ($)</span>
+                    <span className="s-val">{fmtMoney(exportReport.total_cost_usd, "usd")}</span>
+                    {exportReport.total_cost_iqd > 0 && <span className="s-sub">{fmtMoney(exportReport.total_cost_iqd, "iqd")}</span>}
+                  </div>
+                  <div className="s-card">
+                    <span className="s-label">کۆی داهات ($)</span>
+                    <span className="s-val">{fmtMoney(exportReport.total_revenue_usd, "usd")}</span>
+                    {exportReport.total_revenue_iqd > 0 && <span className="s-sub">{fmtMoney(exportReport.total_revenue_iqd, "iqd")}</span>}
+                  </div>
+                  <div className="s-card">
+                    <span className="s-label">داهاتی حەمبار ($)</span>
+                    <span className="s-val">{fmtMoney(exportReport.storage_revenue_usd, "usd")}</span>
+                    {exportReport.storage_revenue_iqd > 0 && <span className="s-sub">{fmtMoney(exportReport.storage_revenue_iqd, "iqd")}</span>}
+                  </div>
+                </div>
+
+                {exportReport.top_receivers?.length > 0 && (
+                  <div style={{ marginTop: "1.5rem" }}>
+                    <h3>سەرەکیترین وەرگرەکان</h3>
+                    <div className="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>وەرگر</th><th>بەرمیل</th>
+                            <th>تێچوو ($)</th><th>تێچوو (د.ع)</th>
+                            <th>داهات ($)</th><th>داهات (د.ع)</th>
+                            <th>قازانج ($)</th><th>قازانج (د.ع)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {exportReport.top_receivers.map(r => (
+                            <tr key={r.receiver_name}>
+                              <td><strong>{r.receiver_name}</strong></td>
+                              <td>{Number(r.total_barrels).toFixed(1)}</td>
+                              <td>{fmtMoney(r.total_cost_usd, "usd")}</td>
+                              <td>{r.total_cost_iqd > 0 ? fmtMoney(r.total_cost_iqd, "iqd") : "—"}</td>
+                              <td>{fmtMoney(r.total_revenue_usd, "usd")}</td>
+                              <td>{r.total_revenue_iqd > 0 ? fmtMoney(r.total_revenue_iqd, "iqd") : "—"}</td>
+                              <td><span className={r.total_profit_usd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(r.total_profit_usd, "usd")}</span></td>
+                              <td>{r.total_profit_iqd !== 0 ? <span className={r.total_profit_iqd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(r.total_profit_iqd, "iqd")}</span> : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
         </div>
       ) : null}
 

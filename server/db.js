@@ -122,6 +122,54 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tire_sale_date ON tire_sales(sale_date);
   CREATE INDEX IF NOT EXISTS idx_tire_payment_date ON tire_payments(payment_date);
   CREATE INDEX IF NOT EXISTS idx_tire_exp_date ON tire_expenses(expense_date);
+
+  /* ─── هەناردە و حەمباری گاز ─── */
+  CREATE TABLE IF NOT EXISTS gas_exports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    receiver_name TEXT NOT NULL,
+    quantity_liters REAL NOT NULL DEFAULT 0,
+    barrels REAL NOT NULL DEFAULT 0,
+    cost_price_per_barrel_usd REAL NOT NULL DEFAULT 0,
+    cost_price_per_barrel_iqd REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'لە فرۆشتندایە',
+    sell_price_per_barrel_usd REAL NOT NULL DEFAULT 0,
+    sell_price_per_barrel_iqd REAL NOT NULL DEFAULT 0,
+    total_cost_usd REAL NOT NULL DEFAULT 0,
+    total_cost_iqd REAL NOT NULL DEFAULT 0,
+    total_revenue_usd REAL NOT NULL DEFAULT 0,
+    total_revenue_iqd REAL NOT NULL DEFAULT 0,
+    total_profit_usd REAL NOT NULL DEFAULT 0,
+    total_profit_iqd REAL NOT NULL DEFAULT 0,
+    export_date TEXT NOT NULL,
+    note TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS gas_storage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    export_id INTEGER REFERENCES gas_exports(id) ON DELETE SET NULL,
+    receiver_name TEXT NOT NULL,
+    quantity_liters REAL NOT NULL DEFAULT 0,
+    barrels REAL NOT NULL DEFAULT 0,
+    cost_price_per_barrel_usd REAL NOT NULL DEFAULT 0,
+    cost_price_per_barrel_iqd REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'هەمبار',
+    sell_price_per_barrel_usd REAL NOT NULL DEFAULT 0,
+    sell_price_per_barrel_iqd REAL NOT NULL DEFAULT 0,
+    total_cost_usd REAL NOT NULL DEFAULT 0,
+    total_cost_iqd REAL NOT NULL DEFAULT 0,
+    total_revenue_usd REAL NOT NULL DEFAULT 0,
+    total_revenue_iqd REAL NOT NULL DEFAULT 0,
+    total_profit_usd REAL NOT NULL DEFAULT 0,
+    total_profit_iqd REAL NOT NULL DEFAULT 0,
+    stored_at TEXT NOT NULL DEFAULT (datetime('now')),
+    sold_at TEXT DEFAULT NULL,
+    note TEXT DEFAULT ''
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_export_date ON gas_exports(export_date);
+  CREATE INDEX IF NOT EXISTS idx_export_status ON gas_exports(status);
+  CREATE INDEX IF NOT EXISTS idx_storage_status ON gas_storage(status);
 `);
 
 /* ─── migration: زیادکردنی ستوونی note بۆ خشتەی transactions ─── */

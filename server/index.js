@@ -231,6 +231,15 @@ app.get("/api/admin/backup-db", adminOnly, (req, res) => {
     return res.json({ type: "tires", tires_inventory, tire_customers, tire_sales, tire_sale_items, tire_payments, tire_expenses });
   }
 
+  if (type === "exports") {
+    const gas_exports = db.prepare("SELECT * FROM gas_exports").all();
+    const gas_storage = db.prepare("SELECT * FROM gas_storage").all();
+    
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", "attachment; filename=gazxana_exports_backup.json");
+    return res.json({ type: "exports", gas_exports, gas_storage });
+  }
+
   const dbPath = path.join(__dirname, "..", "data", "gazxana.sqlite");
   if (!fs.existsSync(dbPath)) {
     return res.status(404).json({ error: "داتابەیس نەدۆزرایەوە" });
@@ -264,6 +273,8 @@ app.post("/api/admin/reset-db", adminOnly, (req, res) => {
       db.prepare("DELETE FROM debtors").run();
       db.prepare("DELETE FROM expenses").run();
       db.prepare("DELETE FROM tire_expenses").run();
+      db.prepare("DELETE FROM gas_storage").run();
+      db.prepare("DELETE FROM gas_exports").run();
       db.pragma("foreign_keys = ON");
     })();
     res.json({ ok: true });
@@ -1409,6 +1420,336 @@ app.delete("/api/tire-expenses/:id", adminOrTire, (req, res) => {
     console.error("Error deleting tire expense:", err);
     res.status(500).json({ error: "سڕینەوەی مسروف سەرنەکەوت" });
   }
+});
+
+
+/* ═══════ هەناردەی گاز (Gas Exports) ═══════ */
+
+app.get("/api/exports", adminOrUser, (req, res) => {
+  const from = req.query.from || "";
+  const to = req.query.to || "";
+  const status = req.query.status || "";
+  let sql = "SELECT * FROM gas_exports WHERE 1=1";
+  const params = [];
+  if (from) { sql += " AND export_date >= ?"; params.push(from); }
+  if (to) { sql += " AND export_date <= ?"; params.push(to); }
+  if (status) { sql += " AND status = ?"; params.push(status); }
+  sql += " ORDER BY export_date DESC, id DESC LIMIT 500";
+  const rows = db.prepare(sql).all(...params);
+  res.json(rows);
+});
+
+app.post("/api/exports", adminOrUser, (req, res) => {
+  const receiver_name = String(req.body?.receiver_name ?? "").trim();
+  if (!receiver_name) return res.status(400).json({ error: "ناوی وەرگر پێویستە" });
+  
+  const quantity_liters = Number(req.body?.quantity_liters) || 0;
+  if (quantity_liters <= 0) return res.status(400).json({ error: "بڕی لیتر دەبێت لە سفر گەورەتر بێت" });
+  
+  const barrels = quantity_liters / 220;
+  const cost_price_per_barrel_usd = Number(req.body?.cost_price_per_barrel_usd) || 0;
+  const cost_price_per_barrel_iqd = Number(req.body?.cost_price_per_barrel_iqd) || 0;
+  const status = String(req.body?.status ?? "لە فرۆشتندایە").trim();
+  const sell_price_per_barrel_usd = Number(req.body?.sell_price_per_barrel_usd) || 0;
+  const sell_price_per_barrel_iqd = Number(req.body?.sell_price_per_barrel_iqd) || 0;
+  const export_date = String(req.body?.export_date ?? "").trim();
+  const note = String(req.body?.note ?? "").trim();
+  
+  if (!export_date) return res.status(400).json({ error: "ڕێکەوت پێویستە" });
+  
+  const total_cost_usd = barrels * cost_price_per_barrel_usd;
+  const total_cost_iqd = barrels * cost_price_per_barrel_iqd;
+  const total_revenue_usd = status === "فرۆشرا" ? barrels * sell_price_per_barrel_usd : 0;
+  const total_revenue_iqd = status === "فرۆشرا" ? barrels * sell_price_per_barrel_iqd : 0;
+  const total_profit_usd = total_revenue_usd - total_cost_usd;
+  const total_profit_iqd = total_revenue_iqd - total_cost_iqd;
+  
+  try {
+    const info = db.prepare(`
+      INSERT INTO gas_exports (
+        receiver_name, quantity_liters, barrels,
+        cost_price_per_barrel_usd, cost_price_per_barrel_iqd,
+        status, sell_price_per_barrel_usd, sell_price_per_barrel_iqd,
+        total_cost_usd, total_cost_iqd,
+        total_revenue_usd, total_revenue_iqd,
+        total_profit_usd, total_profit_iqd,
+        export_date, note
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run(
+      receiver_name, quantity_liters, barrels,
+      cost_price_per_barrel_usd, cost_price_per_barrel_iqd,
+      status, sell_price_per_barrel_usd, sell_price_per_barrel_iqd,
+      total_cost_usd, total_cost_iqd,
+      total_revenue_usd, total_revenue_iqd,
+      total_profit_usd, total_profit_iqd,
+      export_date, note
+    );
+    
+    const row = db.prepare("SELECT * FROM gas_exports WHERE id = ?").get(info.lastInsertRowid);
+    
+    // ئەگەر بارودۆخی حەمبار کراوە بوو، ئۆتۆماتیک بگوازەوە بۆ حەمبار
+    if (status === "حەمبار کراوە") {
+      db.prepare(`
+        INSERT INTO gas_storage (
+          export_id, receiver_name, quantity_liters, barrels,
+          cost_price_per_barrel_usd, cost_price_per_barrel_iqd,
+          status, total_cost_usd, total_cost_iqd, note
+        ) VALUES (?,?,?,?,?,?,?,?,?,?)
+      `).run(
+        row.id, receiver_name, quantity_liters, barrels,
+        cost_price_per_barrel_usd, cost_price_per_barrel_iqd,
+        "هەمبار", total_cost_usd, total_cost_iqd, note
+      );
+    }
+    
+    res.status(201).json(row);
+  } catch (e) {
+    console.error("Error adding export:", e);
+    res.status(500).json({ error: "تۆمارکردنی هەناردە سەرنەکەوت" });
+  }
+});
+
+app.patch("/api/exports/:id", adminOrUser, (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM gas_exports WHERE id = ?").get(id);
+  if (!cur) return res.status(404).json({ error: "نەدۆزرایەوە" });
+  
+  const receiver_name = req.body?.receiver_name != null ? String(req.body.receiver_name).trim() : cur.receiver_name;
+  const quantity_liters = req.body?.quantity_liters != null ? Number(req.body.quantity_liters) : cur.quantity_liters;
+  const barrels = quantity_liters / 220;
+  const cost_price_per_barrel_usd = req.body?.cost_price_per_barrel_usd != null ? Number(req.body.cost_price_per_barrel_usd) : cur.cost_price_per_barrel_usd;
+  const cost_price_per_barrel_iqd = req.body?.cost_price_per_barrel_iqd != null ? Number(req.body.cost_price_per_barrel_iqd) : cur.cost_price_per_barrel_iqd;
+  const status = req.body?.status != null ? String(req.body.status).trim() : cur.status;
+  const sell_price_per_barrel_usd = req.body?.sell_price_per_barrel_usd != null ? Number(req.body.sell_price_per_barrel_usd) : cur.sell_price_per_barrel_usd;
+  const sell_price_per_barrel_iqd = req.body?.sell_price_per_barrel_iqd != null ? Number(req.body.sell_price_per_barrel_iqd) : cur.sell_price_per_barrel_iqd;
+  const export_date = req.body?.export_date != null ? String(req.body.export_date).trim() : cur.export_date;
+  const note = req.body?.note != null ? String(req.body.note).trim() : cur.note;
+  
+  const total_cost_usd = barrels * cost_price_per_barrel_usd;
+  const total_cost_iqd = barrels * cost_price_per_barrel_iqd;
+  const total_revenue_usd = status === "فرۆشرا" ? barrels * sell_price_per_barrel_usd : 0;
+  const total_revenue_iqd = status === "فرۆشرا" ? barrels * sell_price_per_barrel_iqd : 0;
+  const total_profit_usd = total_revenue_usd - total_cost_usd;
+  const total_profit_iqd = total_revenue_iqd - total_cost_iqd;
+  
+  try {
+    const executeUpdate = db.transaction(() => {
+      db.prepare(`
+        UPDATE gas_exports SET
+          receiver_name = ?, quantity_liters = ?, barrels = ?,
+          cost_price_per_barrel_usd = ?, cost_price_per_barrel_iqd = ?,
+          status = ?, sell_price_per_barrel_usd = ?, sell_price_per_barrel_iqd = ?,
+          total_cost_usd = ?, total_cost_iqd = ?,
+          total_revenue_usd = ?, total_revenue_iqd = ?,
+          total_profit_usd = ?, total_profit_iqd = ?,
+          export_date = ?, note = ?
+        WHERE id = ?
+      `).run(
+        receiver_name, quantity_liters, barrels,
+        cost_price_per_barrel_usd, cost_price_per_barrel_iqd,
+        status, sell_price_per_barrel_usd, sell_price_per_barrel_iqd,
+        total_cost_usd, total_cost_iqd,
+        total_revenue_usd, total_revenue_iqd,
+        total_profit_usd, total_profit_iqd,
+        export_date, note, id
+      );
+      
+      // ئەگەر بارودۆخ گۆڕا بۆ حەمبار و پێشتر حەمبار نەبووە
+      if (status === "حەمبار کراوە" && cur.status !== "حەمبار کراوە") {
+        db.prepare(`
+          INSERT INTO gas_storage (
+            export_id, receiver_name, quantity_liters, barrels,
+            cost_price_per_barrel_usd, cost_price_per_barrel_iqd,
+            status, total_cost_usd, total_cost_iqd, note
+          ) VALUES (?,?,?,?,?,?,?,?,?,?)
+        `).run(
+          id, receiver_name, quantity_liters, barrels,
+          cost_price_per_barrel_usd, cost_price_per_barrel_iqd,
+          "هەمبار", total_cost_usd, total_cost_iqd, note
+        );
+      }
+    });
+    
+    executeUpdate();
+    const row = db.prepare("SELECT * FROM gas_exports WHERE id = ?").get(id);
+    res.json(row);
+  } catch (e) {
+    console.error("Error updating export:", e);
+    res.status(500).json({ error: "نوێکردنەوەی هەناردە سەرنەکەوت" });
+  }
+});
+
+app.delete("/api/exports/:id", adminOrUser, (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    db.transaction(() => {
+      // سڕینەوەی تۆمارەکانی حەمبار کە پەیوەست بەم هەناردەیەوەن
+      db.prepare("DELETE FROM gas_storage WHERE export_id = ?").run(id);
+      const info = db.prepare("DELETE FROM gas_exports WHERE id = ?").run(id);
+      if (info.changes === 0) throw new Error("not_found");
+    })();
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.message === "not_found") return res.status(404).json({ error: "نەدۆزرایەوە" });
+    console.error("Error deleting export:", e);
+    res.status(500).json({ error: "سڕینەوەی هەناردە سەرنەکەوت" });
+  }
+});
+
+/* ═══════ حەمباری گاز (Gas Storage) ═══════ */
+
+app.get("/api/gas-storage", adminOrUser, (_req, res) => {
+  const rows = db.prepare("SELECT * FROM gas_storage ORDER BY stored_at DESC, id DESC").all();
+  res.json(rows);
+});
+
+app.get("/api/gas-storage/summary", adminOrUser, (_req, res) => {
+  const summary = db.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN status = 'هەمبار' THEN quantity_liters ELSE 0 END), 0) AS total_liters,
+      COALESCE(SUM(CASE WHEN status = 'هەمبار' THEN barrels ELSE 0 END), 0) AS total_barrels,
+      COALESCE(SUM(CASE WHEN status = 'هەمبار' THEN total_cost_usd ELSE 0 END), 0) AS total_cost_usd,
+      COALESCE(SUM(CASE WHEN status = 'هەمبار' THEN total_cost_iqd ELSE 0 END), 0) AS total_cost_iqd,
+      COUNT(CASE WHEN status = 'هەمبار' THEN 1 END) AS available_count,
+      COUNT(CASE WHEN status = 'فرۆشرا' THEN 1 END) AS sold_count,
+      COALESCE(SUM(CASE WHEN status = 'فرۆشرا' THEN total_revenue_usd ELSE 0 END), 0) AS sold_revenue_usd,
+      COALESCE(SUM(CASE WHEN status = 'فرۆشرا' THEN total_revenue_iqd ELSE 0 END), 0) AS sold_revenue_iqd,
+      COALESCE(SUM(CASE WHEN status = 'فرۆشرا' THEN total_profit_usd ELSE 0 END), 0) AS sold_profit_usd,
+      COALESCE(SUM(CASE WHEN status = 'فرۆشرا' THEN total_profit_iqd ELSE 0 END), 0) AS sold_profit_iqd
+    FROM gas_storage
+  `).get();
+  res.json(summary);
+});
+
+app.post("/api/gas-storage/:id/sell", adminOrUser, (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM gas_storage WHERE id = ?").get(id);
+  if (!cur) return res.status(404).json({ error: "تۆماری حەمبار نەدۆزرایەوە" });
+  if (cur.status === "فرۆشرا") return res.status(400).json({ error: "ئەم تۆمارە پێشتر فرۆشراوە" });
+  
+  const sell_price_per_barrel_usd = Number(req.body?.sell_price_per_barrel_usd) || 0;
+  const sell_price_per_barrel_iqd = Number(req.body?.sell_price_per_barrel_iqd) || 0;
+  
+  if (sell_price_per_barrel_usd <= 0 && sell_price_per_barrel_iqd <= 0) {
+    return res.status(400).json({ error: "نرخی فرۆشتنی بەرمیل پێویستە" });
+  }
+  
+  const total_revenue_usd = cur.barrels * sell_price_per_barrel_usd;
+  const total_revenue_iqd = cur.barrels * sell_price_per_barrel_iqd;
+  const total_profit_usd = total_revenue_usd - cur.total_cost_usd;
+  const total_profit_iqd = total_revenue_iqd - cur.total_cost_iqd;
+  
+  try {
+    db.prepare(`
+      UPDATE gas_storage SET
+        status = 'فرۆشرا',
+        sell_price_per_barrel_usd = ?,
+        sell_price_per_barrel_iqd = ?,
+        total_revenue_usd = ?,
+        total_revenue_iqd = ?,
+        total_profit_usd = ?,
+        total_profit_iqd = ?,
+        sold_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      sell_price_per_barrel_usd, sell_price_per_barrel_iqd,
+      total_revenue_usd, total_revenue_iqd,
+      total_profit_usd, total_profit_iqd, id
+    );
+    const row = db.prepare("SELECT * FROM gas_storage WHERE id = ?").get(id);
+    res.json(row);
+  } catch (e) {
+    console.error("Error selling from storage:", e);
+    res.status(500).json({ error: "فرۆشتن لە حەمبارەوە سەرنەکەوت" });
+  }
+});
+
+/* ═══════ ڕاپۆرتی هەناردە (Export Reports) ═══════ */
+
+app.get("/api/export-reports/summary", adminOrUser, (req, res) => {
+  const from = req.query.from || "";
+  const to = req.query.to || "";
+  
+  // کۆی هەناردەکان
+  let expSql = `
+    SELECT
+      COUNT(*) AS total_count,
+      COALESCE(SUM(quantity_liters), 0) AS total_liters,
+      COALESCE(SUM(barrels), 0) AS total_barrels,
+      COALESCE(SUM(total_cost_usd), 0) AS total_cost_usd,
+      COALESCE(SUM(total_cost_iqd), 0) AS total_cost_iqd,
+      COALESCE(SUM(CASE WHEN status = 'فرۆشرا' THEN total_revenue_usd ELSE 0 END), 0) AS total_revenue_usd,
+      COALESCE(SUM(CASE WHEN status = 'فرۆشرا' THEN total_revenue_iqd ELSE 0 END), 0) AS total_revenue_iqd,
+      COALESCE(SUM(CASE WHEN status = 'فرۆشرا' THEN total_profit_usd ELSE 0 END), 0) AS total_profit_usd,
+      COALESCE(SUM(CASE WHEN status = 'فرۆشرا' THEN total_profit_iqd ELSE 0 END), 0) AS total_profit_iqd,
+      COUNT(CASE WHEN status = 'فرۆشرا' THEN 1 END) AS sold_count,
+      COUNT(CASE WHEN status = 'لە فرۆشتندایە' THEN 1 END) AS in_progress_count,
+      COUNT(CASE WHEN status = 'حەمبار کراوە' THEN 1 END) AS stored_count
+    FROM gas_exports WHERE 1=1
+  `;
+  const expParams = [];
+  if (from) { expSql += " AND export_date >= ?"; expParams.push(from); }
+  if (to) { expSql += " AND export_date <= ?"; expParams.push(to); }
+  const exportSummary = db.prepare(expSql).get(...expParams);
+  
+  // قازانجی فرۆشتن لە حەمبارەوە
+  const storageSold = db.prepare(`
+    SELECT
+      COALESCE(SUM(total_revenue_usd), 0) AS storage_revenue_usd,
+      COALESCE(SUM(total_revenue_iqd), 0) AS storage_revenue_iqd,
+      COALESCE(SUM(total_profit_usd), 0) AS storage_profit_usd,
+      COALESCE(SUM(total_profit_iqd), 0) AS storage_profit_iqd,
+      COUNT(*) AS storage_sold_count
+    FROM gas_storage WHERE status = 'فرۆشرا'
+  `).get();
+  
+  // ئامانجی بەردەست لە حەمبار
+  const storageAvailable = db.prepare(`
+    SELECT
+      COALESCE(SUM(quantity_liters), 0) AS available_liters,
+      COALESCE(SUM(barrels), 0) AS available_barrels,
+      COALESCE(SUM(total_cost_usd), 0) AS available_cost_usd,
+      COALESCE(SUM(total_cost_iqd), 0) AS available_cost_iqd
+    FROM gas_storage WHERE status = 'هەمبار'
+  `).get();
+  
+  // سەرەکیترین وەرگرەکان
+  let topSql = `
+    SELECT receiver_name,
+      SUM(barrels) AS total_barrels,
+      SUM(total_cost_usd) AS total_cost_usd,
+      SUM(total_cost_iqd) AS total_cost_iqd,
+      SUM(CASE WHEN status = 'فرۆشرا' THEN total_revenue_usd ELSE 0 END) AS total_revenue_usd,
+      SUM(CASE WHEN status = 'فرۆشرا' THEN total_revenue_iqd ELSE 0 END) AS total_revenue_iqd,
+      SUM(CASE WHEN status = 'فرۆشرا' THEN total_profit_usd ELSE 0 END) AS total_profit_usd,
+      SUM(CASE WHEN status = 'فرۆشرا' THEN total_profit_iqd ELSE 0 END) AS total_profit_iqd
+    FROM gas_exports WHERE 1=1
+  `;
+  const topParams = [];
+  if (from) { topSql += " AND export_date >= ?"; topParams.push(from); }
+  if (to) { topSql += " AND export_date <= ?"; topParams.push(to); }
+  topSql += " GROUP BY receiver_name ORDER BY total_barrels DESC LIMIT 10";
+  const topReceivers = db.prepare(topSql).all(...topParams);
+  
+  // کۆی قازانج (هەناردە + حەمبار)
+  const grandTotalProfitUsd = (exportSummary.total_profit_usd || 0) + (storageSold.storage_profit_usd || 0);
+  const grandTotalProfitIqd = (exportSummary.total_profit_iqd || 0) + (storageSold.storage_profit_iqd || 0);
+  
+  res.json({
+    ...exportSummary,
+    storage_revenue_usd: storageSold.storage_revenue_usd,
+    storage_revenue_iqd: storageSold.storage_revenue_iqd,
+    storage_profit_usd: storageSold.storage_profit_usd,
+    storage_profit_iqd: storageSold.storage_profit_iqd,
+    storage_sold_count: storageSold.storage_sold_count,
+    available_liters: storageAvailable.available_liters,
+    available_barrels: storageAvailable.available_barrels,
+    available_cost_usd: storageAvailable.available_cost_usd,
+    available_cost_iqd: storageAvailable.available_cost_iqd,
+    grand_total_profit_usd: grandTotalProfitUsd,
+    grand_total_profit_iqd: grandTotalProfitIqd,
+    top_receivers: topReceivers,
+  });
 });
 
 
