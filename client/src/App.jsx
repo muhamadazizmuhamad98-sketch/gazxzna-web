@@ -295,6 +295,7 @@ export default function App() {
   const [soldItemsFrom, setSoldItemsFrom] = useState("");
   const [soldItemsTo, setSoldItemsTo] = useState("");
   const [soldItemsLoading, setSoldItemsLoading] = useState(false);
+  const [soldItemsSearch, setSoldItemsSearch] = useState("");
   const [soldByTireSort, setSoldByTireSort] = useState({ key: "total_revenue_usd", dir: "desc" });
   const [soldDetailSort, setSoldDetailSort] = useState({ key: "line_revenue", dir: "desc" });
   
@@ -1431,10 +1432,17 @@ export default function App() {
   /* ─── سۆرتکراوی فرۆشراوەکان ─── */
   const sortedSoldByTire = useMemo(() => {
     if (!soldItems || !soldItems.sold_by_tire) return [];
-    const list = soldItems.sold_by_tire.map(item => ({
+    let list = soldItems.sold_by_tire.map(item => ({
       ...item,
       profit: (item.total_revenue_usd || 0) - (item.total_cost_usd || 0)
     }));
+    const q = soldItemsSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(item => 
+        String(item.tire_name || "").toLowerCase().includes(q) ||
+        String(item.tire_size || "").toLowerCase().includes(q)
+      );
+    }
     const { key, dir } = soldByTireSort;
     list.sort((a, b) => {
       let av = a[key] ?? 0, bv = b[key] ?? 0;
@@ -1444,11 +1452,20 @@ export default function App() {
       return 0;
     });
     return list;
-  }, [soldItems, soldByTireSort]);
+  }, [soldItems, soldByTireSort, soldItemsSearch]);
 
   const sortedSoldDetail = useMemo(() => {
     if (!soldItems || !soldItems.sales_detail) return [];
-    const list = [...soldItems.sales_detail];
+    let list = [...soldItems.sales_detail];
+    const q = soldItemsSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(d => 
+        String(d.customer_name || "نەقد (کاش)").toLowerCase().includes(q) ||
+        String(d.tire_name || "").toLowerCase().includes(q) ||
+        String(d.note || "").toLowerCase().includes(q) ||
+        String(d.payment_type || "").toLowerCase().includes(q)
+      );
+    }
     const { key, dir } = soldDetailSort;
     list.sort((a, b) => {
       let av = a[key] ?? 0, bv = b[key] ?? 0;
@@ -1458,7 +1475,35 @@ export default function App() {
       return 0;
     });
     return list;
-  }, [soldItems, soldDetailSort]);
+  }, [soldItems, soldDetailSort, soldItemsSearch]);
+
+  const soldByTireTotals = useMemo(() => {
+    let qty = 0;
+    let cost = 0;
+    let rev = 0;
+    let profit = 0;
+    sortedSoldByTire.forEach((item) => {
+      qty += item.total_sold_qty || 0;
+      cost += item.total_cost_usd || 0;
+      rev += item.total_revenue_usd || 0;
+      profit += item.profit || 0;
+    });
+    return { qty, cost, rev, profit };
+  }, [sortedSoldByTire]);
+
+  const soldDetailTotals = useMemo(() => {
+    let qty = 0;
+    let cost = 0;
+    let rev = 0;
+    let profit = 0;
+    sortedSoldDetail.forEach((d) => {
+      qty += d.sold_qty || 0;
+      cost += d.line_cost || 0;
+      rev += d.line_revenue || 0;
+      profit += d.line_profit || 0;
+    });
+    return { qty, cost, rev, profit };
+  }, [sortedSoldDetail]);
 
   const cartTotals = useMemo(() => {
     let usd = 0;
@@ -3260,6 +3305,12 @@ export default function App() {
             <div className="section-head">
               <h2>فرۆشراوەکان — کۆی گشتی پارەی دراو بە مخزن</h2>
               <div className="filter-row">
+                <input
+                  value={soldItemsSearch}
+                  onChange={(e) => setSoldItemsSearch(e.target.value)}
+                  placeholder="گەڕان بەپێی کڕیار یان جۆری تایە…"
+                  style={{ width: "220px" }}
+                />
                 <label className="filter-label">
                   لە
                   <input type="date" value={soldItemsFrom} onChange={(e) => setSoldItemsFrom(e.target.value)} />
@@ -3372,10 +3423,10 @@ export default function App() {
                           <td>کۆی گشتی</td>
                           <td></td>
                           <td></td>
-                          <td className="num" style={{ color: "var(--primary)" }}>{soldItems.total_sold_qty} دانە</td>
-                          <td className="num debt">{fmtMoney(soldItems.total_cost_sold_usd, "usd")}</td>
-                          <td className="num" style={{ color: "var(--ok)" }}>{fmtMoney(soldItems.total_revenue_usd, "usd")}</td>
-                          <td className="num" style={{ color: soldItems.total_profit_usd >= 0 ? "var(--ok)" : "var(--owe)" }}>{fmtMoney(soldItems.total_profit_usd, "usd")}</td>
+                          <td className="num" style={{ color: "var(--primary)" }}>{soldByTireTotals.qty} دانە</td>
+                          <td className="num debt">{fmtMoney(soldByTireTotals.cost, "usd")}</td>
+                          <td className="num" style={{ color: "var(--ok)" }}>{fmtMoney(soldByTireTotals.rev, "usd")}</td>
+                          <td className="num" style={{ color: soldByTireTotals.profit >= 0 ? "var(--ok)" : "var(--owe)" }}>{fmtMoney(soldByTireTotals.profit, "usd")}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -3453,6 +3504,18 @@ export default function App() {
                             <td className="num" style={{ fontWeight: "600", color: d.line_profit >= 0 ? "var(--ok)" : "var(--owe)" }}>{fmtMoney(d.line_profit, "usd")}</td>
                           </tr>
                         ))}
+                        {/* ڕیزی کۆی گشتی بۆ وردەکارییەکان */}
+                        <tr style={{ background: "var(--bg)", fontWeight: "700", borderTop: "2px solid var(--border)" }}>
+                          <td>کۆی گشتی</td>
+                          <td></td>
+                          <td></td>
+                          <td className="num" style={{ color: "var(--primary)" }}>{soldDetailTotals.qty} دانە</td>
+                          <td></td>
+                          <td></td>
+                          <td className="num" style={{ color: "var(--ok)" }}>{fmtMoney(soldDetailTotals.rev, "usd")}</td>
+                          <td className="num debt">{fmtMoney(soldDetailTotals.cost, "usd")}</td>
+                          <td className="num" style={{ color: soldDetailTotals.profit >= 0 ? "var(--ok)" : "var(--owe)" }}>{fmtMoney(soldDetailTotals.profit, "usd")}</td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
