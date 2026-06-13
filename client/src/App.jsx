@@ -658,6 +658,7 @@ export default function App() {
     } else if (tab === "tire_debtors") {
       loadTireCustomers();
       loadTirePayments();
+      loadTireSales();
     } else if (tab === "tire_reports") {
       loadTireReport();
     } else if (tab === "tire_sold_items") {
@@ -1504,6 +1505,243 @@ export default function App() {
     });
     return { qty, cost, rev, profit };
   }, [sortedSoldDetail]);
+
+  const tireCustomerStatement = useMemo(() => {
+    if (!focusedTireCustomerId || !focusedTireCustomerDetail) return [];
+
+    const list = [];
+    let runningUsd = 0;
+
+    // 1. Initial Balance
+    const initVal = focusedTireCustomerDetail.initial_balance_usd || 0;
+    runningUsd += initVal;
+    list.push({
+      date: focusedTireCustomerDetail.created_at ? focusedTireCustomerDetail.created_at.substring(0, 10) : "",
+      type: "قەرزی سەرەتایی",
+      description: "قەرزی سەرەتایی لە کاتی تۆمارکردنی ناو",
+      debit_usd: initVal,
+      credit_usd: 0,
+      balance_usd: runningUsd
+    });
+
+    // 2. Sales
+    const customerSales = tireSales.filter(s => String(s.customer_id) === String(focusedTireCustomerId));
+    customerSales.forEach(s => {
+      const itemsDesc = (s.items || []).map(i => `${i.quantity}x ${i.tire_name}`).join("، ");
+      list.push({
+        date: s.sale_date,
+        type: "فرۆشتن",
+        description: itemsDesc ? `کڕینی تایە (${itemsDesc})` : "فرۆشتنی تایە",
+        debit_usd: s.total_usd || 0,
+        credit_usd: s.paid_usd || 0
+      });
+    });
+
+    // 3. Payments
+    const customerPayments = tirePayments.filter(p => String(p.customer_id) === String(focusedTireCustomerId));
+    customerPayments.forEach(p => {
+      list.push({
+        date: p.payment_date,
+        type: "واسڵکردن",
+        description: p.note ? `واسڵکردنی پارە (${p.note})` : "واسڵکردنی پارە",
+        debit_usd: 0,
+        credit_usd: p.amount_usd || 0
+      });
+    });
+
+    // Sort chronologically by date
+    list.sort((a, b) => {
+      if (a.date !== b.date) {
+        return a.date.localeCompare(b.date);
+      }
+      if (a.type === "قەرزی سەرەتایی") return -1;
+      if (b.type === "قەرزی سەرەتایی") return 1;
+      if (a.type === "فرۆشتن" && b.type === "واسڵکردن") return -1;
+      if (a.type === "واسڵکردن" && b.type === "فرۆشتن") return 1;
+      return 0;
+    });
+
+    // Recalculate running balance
+    let bal = 0;
+    list.forEach(item => {
+      bal += (item.debit_usd || 0) - (item.credit_usd || 0);
+      item.balance_usd = bal;
+    });
+
+    return list;
+  }, [focusedTireCustomerId, focusedTireCustomerDetail, tireSales, tirePayments]);
+
+  function printTireCustomerStatement() {
+    if (!focusedTireCustomerDetail || tireCustomerStatement.length === 0) return;
+    const printWindow = window.open("", "_blank");
+    
+    let totalDebit = 0;
+    let totalCredit = 0;
+    tireCustomerStatement.forEach(item => {
+      totalDebit += item.debit_usd || 0;
+      totalCredit += item.credit_usd || 0;
+    });
+    const finalBalance = totalDebit - totalCredit;
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="ku" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>کەشف حیسابی - ${focusedTireCustomerDetail.name}</title>
+        <style>
+          body {
+            font-family: Tahoma, Geneva, sans-serif;
+            margin: 40px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 15px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #1e3a8a;
+          }
+          .header p {
+            margin: 5px 0 0;
+            color: #666;
+            font-size: 14px;
+          }
+          .info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+          }
+          .info div {
+            font-size: 14px;
+          }
+          .info div strong {
+            color: #1e3a8a;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+          }
+          th, td {
+            border: 1px solid #cbd5e1;
+            padding: 10px 12px;
+            text-align: right;
+            font-size: 13px;
+          }
+          th {
+            background-color: #f1f5f9;
+            color: #1e3a8a;
+            font-weight: 700;
+          }
+          tr:nth-child(even) td {
+            background-color: #f8fafc;
+          }
+          .totals {
+            margin-top: 20px;
+            float: left;
+            width: 300px;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 15px;
+          }
+          .totals-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+          }
+          .totals-row.grand {
+            border-top: 2px solid #3b82f6;
+            padding-top: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            color: #1e3a8a;
+          }
+          .footer {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            clear: both;
+          }
+          @media print {
+            body { margin: 20px; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>گازخانە — بەشی تایە</h1>
+          <p>کەشف حیسابی قەرزدار</p>
+        </div>
+        <div class="info">
+          <div>ناوی قەرزدار: <strong>${focusedTireCustomerDetail.name}</strong></div>
+          <div>مۆبایل: <strong>${focusedTireCustomerDetail.phone || "—"}</strong></div>
+          <div>ڕێکەوت: <strong>${new Date().toLocaleDateString('ku-IQ')}</strong></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ڕێکەوت</th>
+              <th>جۆری مامەڵە</th>
+              <th>وردەکاری</th>
+              <th>بڕی قەرز (قەرزدارە)</th>
+              <th>بڕی واسڵکراو (واسڵ)</th>
+              <th>باڵانس / ماوە</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tireCustomerStatement.map(item => `
+              <tr>
+                <td>${item.date}</td>
+                <td>${item.type}</td>
+                <td>${item.description}</td>
+                <td style="font-weight: 600; color: ${item.debit_usd > 0 ? '#b91c1c' : '#333'}">${item.debit_usd > 0 ? '$' + item.debit_usd.toFixed(2) : '—'}</td>
+                <td style="font-weight: 600; color: ${item.credit_usd > 0 ? '#15803d' : '#333'}">${item.credit_usd > 0 ? '$' + item.credit_usd.toFixed(2) : '—'}</td>
+                <td style="font-weight: 700; color: ${item.balance_usd > 0 ? '#b91c1c' : '#15803d'}">$${item.balance_usd.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="totals">
+          <div class="totals-row">
+            <span>کۆی گشتی قەرزەکان:</span>
+            <span>$${totalDebit.toFixed(2)}</span>
+          </div>
+          <div class="totals-row">
+            <span>کۆی گشتی واسڵکراو:</span>
+            <span>$${totalCredit.toFixed(2)}</span>
+          </div>
+          <div class="totals-row grand">
+            <span>ماوەی قەرزی کۆتایی:</span>
+            <span>$${finalBalance.toFixed(2)}</span>
+          </div>
+        </div>
+        <div class="footer">
+          <p>سیستەمی گازخانە — بەڕێوەبردنی قەرز و مامەڵە</p>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
 
   const cartTotals = useMemo(() => {
     let usd = 0;
@@ -3285,6 +3523,68 @@ export default function App() {
                           <tr>
                             <td colSpan={4} className="muted" style={{ textAlign: "center", padding: "1rem" }}>
                               هیچ پارەیەکی وەرگیراو نییە.
+                            </td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                {/* کەشف حیسابی (Statement of Account) */}
+                <section className="card">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                    <h3>کەشف حیسابی — {focusedTireCustomerDetail.name}</h3>
+                    <button type="button" className="primary" onClick={printTireCustomerStatement} style={{ minHeight: "1.8rem", padding: "0 0.75rem", fontSize: "0.85rem" }}>
+                      🖨️ چاپکردن
+                    </button>
+                  </div>
+                  
+                  <div className="table-wrap" style={{ maxHeight: "350px", overflowY: "auto" }}>
+                    <table className="data compact">
+                      <thead>
+                        <tr>
+                          <th>ڕێکەوت</th>
+                          <th>جۆر</th>
+                          <th>وردەکاری</th>
+                          <th>قەرزدارە</th>
+                          <th>واسڵ</th>
+                          <th>باڵانس</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tireCustomerStatement.map((item, idx) => (
+                          <tr key={idx}>
+                            <td>{item.date}</td>
+                            <td>
+                              <span style={{ 
+                                display: "inline-block", 
+                                padding: "0.15rem 0.45rem", 
+                                borderRadius: "4px", 
+                                fontSize: "0.75rem", 
+                                fontWeight: "600", 
+                                background: item.type === "فرۆشتن" ? "#fee2e2" : item.type === "واسڵکردن" ? "#dcfce7" : "#f1f5f9", 
+                                color: item.type === "فرۆشتن" ? "#991b1b" : item.type === "واسڵکردن" ? "#166534" : "#475569" 
+                              }}>
+                                {item.type}
+                              </span>
+                            </td>
+                            <td className="muted" style={{ fontSize: "0.8rem", whiteSpace: "normal", wordBreak: "break-all" }}>{item.description}</td>
+                            <td className="num" style={{ color: item.debit_usd > 0 ? "var(--owe)" : "inherit" }}>
+                              {item.debit_usd > 0 ? fmtMoney(item.debit_usd, "usd") : "—"}
+                            </td>
+                            <td className="num" style={{ color: item.credit_usd > 0 ? "var(--ok)" : "inherit" }}>
+                              {item.credit_usd > 0 ? fmtMoney(item.credit_usd, "usd") : "—"}
+                            </td>
+                            <td className="num" style={{ fontWeight: "700", color: item.balance_usd > 0 ? "var(--owe)" : "var(--ok)" }}>
+                              {fmtMoney(item.balance_usd, "usd")}
+                            </td>
+                          </tr>
+                        ))}
+                        {tireCustomerStatement.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="muted" style={{ textAlign: "center", padding: "1rem" }}>
+                              هیچ مامەڵەیەک تۆمار نەکراوە.
                             </td>
                           </tr>
                         ) : null}
