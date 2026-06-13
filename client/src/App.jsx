@@ -4272,9 +4272,9 @@ export default function App() {
                   body: JSON.stringify({
                     ...gasExportForm,
                     quantity_liters: liters,
-                    cost_price_per_barrel_usd: num(gasExportForm.cost_price_per_barrel_usd),
+                    cost_price_per_barrel_usd: 0,
                     cost_price_per_barrel_iqd: num(gasExportForm.cost_price_per_barrel_iqd),
-                    sell_price_per_barrel_usd: num(gasExportForm.sell_price_per_barrel_usd),
+                    sell_price_per_barrel_usd: 0,
                     sell_price_per_barrel_iqd: num(gasExportForm.sell_price_per_barrel_iqd),
                   }),
                 });
@@ -4303,10 +4303,6 @@ export default function App() {
                 <input type="text" readOnly value={num(gasExportForm.quantity_liters) > 0 ? (num(gasExportForm.quantity_liters) / 220).toFixed(2) : "—"} className="computed-field" />
               </label>
               <label>
-                نرخی کڕین / بەرمیل ($)
-                <input type="number" step="any" value={gasExportForm.cost_price_per_barrel_usd} onChange={e => setGasExportForm(f => ({ ...f, cost_price_per_barrel_usd: e.target.value }))} placeholder="0" />
-              </label>
-              <label>
                 نرخی کڕین / بەرمیل (د.ع)
                 <input type="number" step="any" value={gasExportForm.cost_price_per_barrel_iqd} onChange={e => setGasExportForm(f => ({ ...f, cost_price_per_barrel_iqd: e.target.value }))} placeholder="0" />
               </label>
@@ -4323,26 +4319,15 @@ export default function App() {
                 </select>
               </label>
               {gasExportForm.status === "فرۆشرا" && (
-                <>
-                  <label>
-                    نرخی فرۆشتن / بەرمیل ($)
-                    <input type="number" step="any" value={gasExportForm.sell_price_per_barrel_usd} onChange={e => setGasExportForm(f => ({ ...f, sell_price_per_barrel_usd: e.target.value }))} placeholder="0" />
-                  </label>
-                  <label>
-                    نرخی فرۆشتن / بەرمیل (د.ع)
-                    <input type="number" step="any" value={gasExportForm.sell_price_per_barrel_iqd} onChange={e => setGasExportForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} placeholder="0" />
-                  </label>
-                </>
+                <label>
+                  نرخی فرۆشتن / بەرمیل (د.ع)
+                  <input type="number" step="any" value={gasExportForm.sell_price_per_barrel_iqd} onChange={e => setGasExportForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} placeholder="0" />
+                </label>
               )}
-              {gasExportForm.status === "فرۆشرا" && num(gasExportForm.quantity_liters) > 0 && (num(gasExportForm.sell_price_per_barrel_usd) > 0 || num(gasExportForm.sell_price_per_barrel_iqd) > 0) && (
+              {gasExportForm.status === "فرۆشرا" && num(gasExportForm.quantity_liters) > 0 && num(gasExportForm.sell_price_per_barrel_iqd) > 0 && (
                 <div className="profit-preview span2">
                   <strong>پێشبینی قازانج:</strong>
-                  {num(gasExportForm.sell_price_per_barrel_usd) > 0 && (
-                    <span> {fmtMoney(((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.sell_price_per_barrel_usd)) - ((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.cost_price_per_barrel_usd)), "usd")}</span>
-                  )}
-                  {num(gasExportForm.sell_price_per_barrel_iqd) > 0 && (
-                    <span> | {fmtMoney(((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.sell_price_per_barrel_iqd)) - ((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.cost_price_per_barrel_iqd)), "iqd")}</span>
-                  )}
+                  <span> {fmtMoney(((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.sell_price_per_barrel_iqd)) - ((num(gasExportForm.quantity_liters) / 220) * num(gasExportForm.cost_price_per_barrel_iqd)), "iqd")}</span>
                 </div>
               )}
               <label className="span2">
@@ -4375,10 +4360,10 @@ export default function App() {
                   <thead>
                     <tr>
                       <th>#</th><th>وەرگر</th><th>لیتر</th><th>بەرمیل</th>
-                      <th>نرخی کڕین ($)</th><th>نرخی کڕین (د.ع)</th>
+                      <th>نرخی کڕین (د.ع)</th>
                       <th>بارودۆخ</th>
-                      <th>نرخی فرۆشتن ($)</th><th>نرخی فرۆشتن (د.ع)</th>
-                      <th>قازانج ($)</th><th>قازانج (د.ع)</th>
+                      <th>نرخی فرۆشتن (د.ع)</th>
+                      <th>قازانج (د.ع)</th>
                       <th>ڕێکەوت</th><th>تێبینی</th><th></th>
                     </tr>
                   </thead>
@@ -4391,16 +4376,13 @@ export default function App() {
                         <td><strong>{ex.receiver_name}</strong></td>
                         <td>{Number(ex.quantity_liters).toLocaleString()}</td>
                         <td>{Number(ex.barrels).toFixed(2)}</td>
-                        <td>{fmtMoney(ex.cost_price_per_barrel_usd, "usd")}</td>
                         <td>{ex.cost_price_per_barrel_iqd > 0 ? fmtMoney(ex.cost_price_per_barrel_iqd, "iqd") : "—"}</td>
                         <td>
                           <span className={`export-status status-${ex.status === "فرۆشرا" ? "sold" : ex.status === "لە فرۆشتندایە" ? "progress" : "stored"}`}>
                             {ex.status}
                           </span>
                         </td>
-                        <td>{ex.status === "فرۆشرا" ? fmtMoney(ex.sell_price_per_barrel_usd, "usd") : "—"}</td>
                         <td>{ex.status === "فرۆشرا" && ex.sell_price_per_barrel_iqd > 0 ? fmtMoney(ex.sell_price_per_barrel_iqd, "iqd") : "—"}</td>
-                        <td>{ex.status === "فرۆشرا" ? <span className={ex.total_profit_usd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(ex.total_profit_usd, "usd")}</span> : "—"}</td>
                         <td>{ex.status === "فرۆشرا" && ex.total_profit_iqd !== 0 ? <span className={ex.total_profit_iqd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(ex.total_profit_iqd, "iqd")}</span> : "—"}</td>
                         <td>{ex.export_date}</td>
                         <td className="muted" style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{ex.note || ""}</td>
@@ -4408,11 +4390,10 @@ export default function App() {
                           {ex.status === "لە فرۆشتندایە" && (
                             exportSellForm.id === ex.id ? (
                               <div className="inline-sell-form" style={{ display: "inline-flex", gap: "4px", marginEnd: "10px" }}>
-                                <input type="number" step="any" placeholder="فرۆشتن ($)" value={exportSellForm.sell_price_per_barrel_usd} onChange={e => setExportSellForm(f => ({ ...f, sell_price_per_barrel_usd: e.target.value }))} style={{ width: 80, padding: "2px 5px", fontSize: "0.85rem" }} />
-                                <input type="number" step="any" placeholder="فرۆشتن (د.ع)" value={exportSellForm.sell_price_per_barrel_iqd} onChange={e => setExportSellForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} style={{ width: 80, padding: "2px 5px", fontSize: "0.85rem" }} />
+                                <input type="number" step="any" placeholder="فرۆشتن (د.ع)" value={exportSellForm.sell_price_per_barrel_iqd} onChange={e => setExportSellForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} style={{ width: 100, padding: "2px 5px", fontSize: "0.85rem" }} />
                                 <button type="button" className="primary compact" onClick={async () => {
                                   setErr("");
-                                  if (num(exportSellForm.sell_price_per_barrel_usd) <= 0 && num(exportSellForm.sell_price_per_barrel_iqd) <= 0) {
+                                  if (num(exportSellForm.sell_price_per_barrel_iqd) <= 0) {
                                     alert("پێویستە نرخێک دیاری بکەیت"); return;
                                   }
                                   const r = await fetch(`${API}/exports/${ex.id}`, {
@@ -4420,7 +4401,7 @@ export default function App() {
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({
                                       status: "فرۆشرا",
-                                      sell_price_per_barrel_usd: num(exportSellForm.sell_price_per_barrel_usd),
+                                      sell_price_per_barrel_usd: 0,
                                       sell_price_per_barrel_iqd: num(exportSellForm.sell_price_per_barrel_iqd),
                                     }),
                                   });
@@ -4489,14 +4470,12 @@ export default function App() {
                 <span className="s-sub">{Number(gasStorageSummary.total_liters).toLocaleString()} لیتر</span>
               </div>
               <div className="s-card s-card-amber">
-                <span className="s-label">نرخی مخزن ($)</span>
-                <span className="s-val">{fmtMoney(gasStorageSummary.total_cost_usd, "usd")}</span>
-                {gasStorageSummary.total_cost_iqd > 0 && <span className="s-sub">{fmtMoney(gasStorageSummary.total_cost_iqd, "iqd")}</span>}
+                <span className="s-label">نرخی مخزن (د.ع)</span>
+                <span className="s-val">{fmtMoney(gasStorageSummary.total_cost_iqd, "iqd")}</span>
               </div>
               <div className="s-card s-card-green">
-                <span className="s-label">قازانجی فرۆشراو ($)</span>
-                <span className="s-val">{fmtMoney(gasStorageSummary.sold_profit_usd, "usd")}</span>
-                {gasStorageSummary.sold_profit_iqd !== 0 && <span className="s-sub">{fmtMoney(gasStorageSummary.sold_profit_iqd, "iqd")}</span>}
+                <span className="s-label">قازانجی فرۆشراو (د.ع)</span>
+                <span className="s-val">{fmtMoney(gasStorageSummary.sold_profit_iqd, "iqd")}</span>
               </div>
               <div className="s-card">
                 <span className="s-label">ئامانج / فرۆشراو</span>
@@ -4512,10 +4491,10 @@ export default function App() {
                   <thead>
                     <tr>
                       <th>#</th><th>وەرگر</th><th>لیتر</th><th>بەرمیل</th>
-                      <th>نرخی کڕین ($)</th><th>نرخی کڕین (د.ع)</th>
+                      <th>نرخی کڕین (د.ع)</th>
                       <th>بارودۆخ</th>
-                      <th>نرخی فرۆشتن ($)</th><th>نرخی فرۆشتن (د.ع)</th>
-                      <th>قازانج ($)</th><th>قازانج (د.ع)</th>
+                      <th>نرخی فرۆشتن (د.ع)</th>
+                      <th>قازانج (د.ع)</th>
                       <th>کاری حەمبار</th><th></th>
                     </tr>
                   </thead>
@@ -4526,33 +4505,29 @@ export default function App() {
                         <td><strong>{s.receiver_name}</strong></td>
                         <td>{Number(s.quantity_liters).toLocaleString()}</td>
                         <td>{Number(s.barrels).toFixed(2)}</td>
-                        <td>{fmtMoney(s.cost_price_per_barrel_usd, "usd")}</td>
                         <td>{s.cost_price_per_barrel_iqd > 0 ? fmtMoney(s.cost_price_per_barrel_iqd, "iqd") : "—"}</td>
                         <td>
                           <span className={`export-status status-${s.status === "فرۆشرا" ? "sold" : "stored"}`}>
                             {s.status}
                           </span>
                         </td>
-                        <td>{s.status === "فرۆشرا" ? fmtMoney(s.sell_price_per_barrel_usd, "usd") : "—"}</td>
                         <td>{s.status === "فرۆشرا" && s.sell_price_per_barrel_iqd > 0 ? fmtMoney(s.sell_price_per_barrel_iqd, "iqd") : "—"}</td>
-                        <td>{s.status === "فرۆشرا" ? <span className={s.total_profit_usd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(s.total_profit_usd, "usd")}</span> : "—"}</td>
                         <td>{s.status === "فرۆشرا" && s.total_profit_iqd !== 0 ? <span className={s.total_profit_iqd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(s.total_profit_iqd, "iqd")}</span> : "—"}</td>
                         <td>
                           {s.status === "هەمبار" ? (
                             storageSellForm.id === s.id ? (
                               <div className="inline-sell-form">
-                                <input type="number" step="any" placeholder="نرخی فرۆشتن ($)" value={storageSellForm.sell_price_per_barrel_usd} onChange={e => setStorageSellForm(f => ({ ...f, sell_price_per_barrel_usd: e.target.value }))} style={{ width: 100 }} />
-                                <input type="number" step="any" placeholder="نرخی فرۆشتن (د.ع)" value={storageSellForm.sell_price_per_barrel_iqd} onChange={e => setStorageSellForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} style={{ width: 100 }} />
+                                <input type="number" step="any" placeholder="نرخی فرۆشتن (د.ع)" value={storageSellForm.sell_price_per_barrel_iqd} onChange={e => setStorageSellForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} style={{ width: 120 }} />
                                 <button type="button" className="primary" onClick={async () => {
                                   setErr("");
-                                  if (num(storageSellForm.sell_price_per_barrel_usd) <= 0 && num(storageSellForm.sell_price_per_barrel_iqd) <= 0) {
+                                  if (num(storageSellForm.sell_price_per_barrel_iqd) <= 0) {
                                     setErr("نرخی فرۆشتن پێویستە"); return;
                                   }
                                   const r = await fetch(`${API}/gas-storage/${s.id}/sell`, {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({
-                                      sell_price_per_barrel_usd: num(storageSellForm.sell_price_per_barrel_usd),
+                                      sell_price_per_barrel_usd: 0,
                                       sell_price_per_barrel_iqd: num(storageSellForm.sell_price_per_barrel_iqd),
                                     }),
                                   });
@@ -4613,18 +4588,15 @@ export default function App() {
                   </div>
                   <div className="s-card s-card-green">
                     <span className="s-label">کۆی قازانج (هەناردە)</span>
-                    <span className="s-val">{fmtMoney(exportReport.total_profit_usd, "usd")}</span>
-                    {exportReport.total_profit_iqd !== 0 && <span className="s-sub">{fmtMoney(exportReport.total_profit_iqd, "iqd")}</span>}
+                    <span className="s-val">{fmtMoney(exportReport.total_profit_iqd, "iqd")}</span>
                   </div>
                   <div className="s-card s-card-teal">
                     <span className="s-label">قازانجی حەمبار</span>
-                    <span className="s-val">{fmtMoney(exportReport.storage_profit_usd, "usd")}</span>
-                    {exportReport.storage_profit_iqd !== 0 && <span className="s-sub">{fmtMoney(exportReport.storage_profit_iqd, "iqd")}</span>}
+                    <span className="s-val">{fmtMoney(exportReport.storage_profit_iqd, "iqd")}</span>
                   </div>
                   <div className="s-card s-card-purple">
                     <span className="s-label">کۆی گشتی قازانج</span>
-                    <span className="s-val">{fmtMoney(exportReport.grand_total_profit_usd, "usd")}</span>
-                    {exportReport.grand_total_profit_iqd !== 0 && <span className="s-sub">{fmtMoney(exportReport.grand_total_profit_iqd, "iqd")}</span>}
+                    <span className="s-val">{fmtMoney(exportReport.grand_total_profit_iqd, "iqd")}</span>
                   </div>
                 </div>
 
@@ -4644,25 +4616,22 @@ export default function App() {
                   <div className="s-card s-card-amber">
                     <span className="s-label">ئامانجی بەردەست لە حەمبار</span>
                     <span className="s-val">{Number(exportReport.available_barrels).toFixed(1)} بەرمیل</span>
-                    <span className="s-sub">{fmtMoney(exportReport.available_cost_usd, "usd")}</span>
+                    <span className="s-sub">{fmtMoney(exportReport.available_cost_iqd, "iqd")}</span>
                   </div>
                 </div>
 
                 <div className="summary-cards export-summary" style={{ marginTop: "1rem" }}>
                   <div className="s-card">
-                    <span className="s-label">کۆی تێچوو ($)</span>
-                    <span className="s-val">{fmtMoney(exportReport.total_cost_usd, "usd")}</span>
-                    {exportReport.total_cost_iqd > 0 && <span className="s-sub">{fmtMoney(exportReport.total_cost_iqd, "iqd")}</span>}
+                    <span className="s-label">کۆی تێچوو (د.ع)</span>
+                    <span className="s-val">{fmtMoney(exportReport.total_cost_iqd, "iqd")}</span>
                   </div>
                   <div className="s-card">
-                    <span className="s-label">کۆی داهات ($)</span>
-                    <span className="s-val">{fmtMoney(exportReport.total_revenue_usd, "usd")}</span>
-                    {exportReport.total_revenue_iqd > 0 && <span className="s-sub">{fmtMoney(exportReport.total_revenue_iqd, "iqd")}</span>}
+                    <span className="s-label">کۆی داهات (د.ع)</span>
+                    <span className="s-val">{fmtMoney(exportReport.total_revenue_iqd, "iqd")}</span>
                   </div>
                   <div className="s-card">
-                    <span className="s-label">داهاتی حەمبار ($)</span>
-                    <span className="s-val">{fmtMoney(exportReport.storage_revenue_usd, "usd")}</span>
-                    {exportReport.storage_revenue_iqd > 0 && <span className="s-sub">{fmtMoney(exportReport.storage_revenue_iqd, "iqd")}</span>}
+                    <span className="s-label">داهاتی حەمبار (د.ع)</span>
+                    <span className="s-val">{fmtMoney(exportReport.storage_revenue_iqd, "iqd")}</span>
                   </div>
                 </div>
 
@@ -4674,9 +4643,9 @@ export default function App() {
                         <thead>
                           <tr>
                             <th>وەرگر</th><th>بەرمیل</th>
-                            <th>تێچوو ($)</th><th>تێچوو (د.ع)</th>
-                            <th>داهات ($)</th><th>داهات (د.ع)</th>
-                            <th>قازانج ($)</th><th>قازانج (د.ع)</th>
+                            <th>تێچوو (د.ع)</th>
+                            <th>داهات (د.ع)</th>
+                            <th>قازانج (د.ع)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -4684,11 +4653,8 @@ export default function App() {
                             <tr key={r.receiver_name}>
                               <td><strong>{r.receiver_name}</strong></td>
                               <td>{Number(r.total_barrels).toFixed(1)}</td>
-                              <td>{fmtMoney(r.total_cost_usd, "usd")}</td>
                               <td>{r.total_cost_iqd > 0 ? fmtMoney(r.total_cost_iqd, "iqd") : "—"}</td>
-                              <td>{fmtMoney(r.total_revenue_usd, "usd")}</td>
                               <td>{r.total_revenue_iqd > 0 ? fmtMoney(r.total_revenue_iqd, "iqd") : "—"}</td>
-                              <td><span className={r.total_profit_usd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(r.total_profit_usd, "usd")}</span></td>
                               <td>{r.total_profit_iqd !== 0 ? <span className={r.total_profit_iqd >= 0 ? "profit-pos" : "profit-neg"}>{fmtMoney(r.total_profit_iqd, "iqd")}</span> : "—"}</td>
                             </tr>
                           ))}
