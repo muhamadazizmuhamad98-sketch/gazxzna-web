@@ -336,6 +336,7 @@ export default function App() {
   const [exportFilterStatus, setExportFilterStatus] = useState("");
   const [exportsLoading, setExportsLoading] = useState(false);
   const [exportSearch, setExportSearch] = useState("");
+  const [exportSellForm, setExportSellForm] = useState({ id: null, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" });
 
   /* ─── حەمباری گاز state ─── */
   const [gasStorage, setGasStorage] = useState([]);
@@ -4404,6 +4405,41 @@ export default function App() {
                         <td>{ex.export_date}</td>
                         <td className="muted" style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{ex.note || ""}</td>
                         <td>
+                          {ex.status === "لە فرۆشتندایە" && (
+                            exportSellForm.id === ex.id ? (
+                              <div className="inline-sell-form" style={{ display: "inline-flex", gap: "4px", marginEnd: "10px" }}>
+                                <input type="number" step="any" placeholder="فرۆشتن ($)" value={exportSellForm.sell_price_per_barrel_usd} onChange={e => setExportSellForm(f => ({ ...f, sell_price_per_barrel_usd: e.target.value }))} style={{ width: 80, padding: "2px 5px", fontSize: "0.85rem" }} />
+                                <input type="number" step="any" placeholder="فرۆشتن (د.ع)" value={exportSellForm.sell_price_per_barrel_iqd} onChange={e => setExportSellForm(f => ({ ...f, sell_price_per_barrel_iqd: e.target.value }))} style={{ width: 80, padding: "2px 5px", fontSize: "0.85rem" }} />
+                                <button type="button" className="primary compact" onClick={async () => {
+                                  setErr("");
+                                  if (num(exportSellForm.sell_price_per_barrel_usd) <= 0 && num(exportSellForm.sell_price_per_barrel_iqd) <= 0) {
+                                    alert("پێویستە نرخێک دیاری بکەیت"); return;
+                                  }
+                                  const r = await fetch(`${API}/exports/${ex.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      status: "فرۆشرا",
+                                      sell_price_per_barrel_usd: num(exportSellForm.sell_price_per_barrel_usd),
+                                      sell_price_per_barrel_iqd: num(exportSellForm.sell_price_per_barrel_iqd),
+                                    }),
+                                  });
+                                  if (r.ok) {
+                                    setExportSellForm({ id: null, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" });
+                                    setInfoMsg("بە سەرکەوتوویی فرۆشرا ✅");
+                                    setTimeout(() => setInfoMsg(""), 3000);
+                                    loadGasExports();
+                                  } else {
+                                    const raw = await r.text();
+                                    setErr(parseJsonFromText(raw)?.error || "فرۆشتن سەرنەکەوت");
+                                  }
+                                }} style={{ padding: "2px 8px", fontSize: "0.85rem" }}>فرۆشتن</button>
+                                <button type="button" className="ghost compact" onClick={() => setExportSellForm({ id: null, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" })} style={{ padding: "2px 5px", fontSize: "0.85rem" }}>پاشگەزبوونەوە</button>
+                              </div>
+                            ) : (
+                              <button type="button" className="primary compact link" onClick={() => setExportSellForm({ id: ex.id, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" })} style={{ marginEnd: "10px", color: "var(--ok)", fontWeight: "bold" }}>فرۆشتن</button>
+                            )
+                          )}
                           <button type="button" className="danger link" onClick={async () => {
                             if (!confirm("ئایا دڵنیایت لە سڕینەوەی ئەم هەناردەیە؟")) return;
                             const r = await fetch(`${API}/exports/${ex.id}`, { method: "DELETE" });
