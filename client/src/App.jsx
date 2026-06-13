@@ -443,13 +443,13 @@ export default function App() {
     }
   }, [reportFrom, reportTo, token, user]);
 
-  function handleDownloadBackup() {
+  function handleDownloadBackup(type = "db") {
     setBackupErr("");
     if (!backupSecret.trim()) {
       setBackupErr("تکایە تێپەڕەوشە بنووسە");
       return;
     }
-    const downloadUrl = `${API}/admin/backup-db?secret=${encodeURIComponent(backupSecret)}`;
+    const downloadUrl = `${API}/admin/backup-db?secret=${encodeURIComponent(backupSecret)}&type=${type}`;
     fetch(downloadUrl, { method: "HEAD" })
       .then((res) => {
         if (!res.ok) {
@@ -511,27 +511,38 @@ export default function App() {
     
     const fileInput = document.getElementById("restore-file-input");
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-      setBackupErr("تکایە فایلی باکئەپەکە (.sqlite) هەڵبژێرە.");
+      setBackupErr("تکایە فایلی باکئەپەکە (.sqlite یان .json) هەڵبژێرە.");
       return;
     }
 
     const file = fileInput.files[0];
-    if (!confirm(`ئایا دڵنیای لە گەڕاندنەوەی ئەم فایلە؟ هەموو زانیارییەکانی ئێستا دەسڕێنەوە و داتاکانی ئەم فایلە جێگەی دەگرنەوە.`)) {
+    const isJson = file.name.endsWith(".json");
+
+    if (!confirm(`ئایا دڵنیای لە گەڕاندنەوەی ئەم فایلە؟ هەموو زانیارییەکانی بەشی پەیوەندیدار دەسڕێنەوە و داتاکانی ئەم فایلە جێگەی دەگرنەوە.`)) {
       return;
     }
 
     try {
       setLoading(true);
       const reader = new FileReader();
+      
       reader.onload = async (e) => {
         try {
-          const arrayBuffer = e.target.result;
+          let bodyData;
+          let headers = {};
+          
+          if (isJson) {
+            bodyData = e.target.result;
+            headers["Content-Type"] = "application/json";
+          } else {
+            bodyData = e.target.result;
+            headers["Content-Type"] = "application/octet-stream";
+          }
+
           const r = await fetch(`${API}/admin/restore-db?secret=${encodeURIComponent(backupSecret)}`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/octet-stream"
-            },
-            body: arrayBuffer
+            headers: headers,
+            body: bodyData
           });
           const raw = await r.text();
           if (!r.ok) {
@@ -545,16 +556,29 @@ export default function App() {
           }
           setBackupSecret("");
           fileInput.value = "";
-          setInfoMsg("داتابەیس بە سەرکەوتوویی گەڕێندرایەوە! سیستەمەکە دوای ٣ چرکە نوێ دەبێتەوە.");
-          setTimeout(() => {
-            window.location.reload();
-          }, 3000);
+          
+          if (isJson) {
+            setInfoMsg("داتاکان بە سەرکەوتوویی گەڕێندرانەوە! پەڕەکە دوای ٢ چرکە نوێ دەبێتەوە.");
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
+          } else {
+            setInfoMsg("داتابەیس بە سەرکەوتوویی گەڕێندرایەوە! سیستەمەکە دوای ٣ چرکە نوێ دەبێتەوە.");
+            setTimeout(() => {
+              window.location.reload();
+            }, 3000);
+          }
         } catch (ex) {
           setBackupErr(String(ex?.message || ex));
           setLoading(false);
         }
       };
-      reader.readAsArrayBuffer(file);
+
+      if (isJson) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
     } catch (ex) {
       setBackupErr(String(ex?.message || ex));
       setLoading(false);
@@ -2711,46 +2735,67 @@ export default function App() {
 
           {/* بەشی باکئەپی داتابەیس */}
           <section className="card card-compact" style={{ marginTop: "1.5rem" }}>
-            <h3>باکئەپ و پاراستنی داتاکان (SQLite Backup)</h3>
+            <h3>باکئەپ و پاراستنی داتاکان (SQLite / JSON Backup)</h3>
             <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
-              لێرەوە دەتوانیت کۆپییەکی تەواوی داتابەیسی سیستەمەکە (`gazxana.sqlite`) دابەزێنیتە سەر کۆمپیوتەرەکەت بۆ پاراستنی حیساباتەکانت.
+              لێرەوە دەتوانیت باکئەپی گشتی یان باکئەپی تایبەت بە هەر بەشێک جیا بکەیتەوە و دایبەزێنیتە سەر کۆمپیوتەرەکەت.
             </p>
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", maxWidth: "550px", marginBottom: "1.25rem" }}>
-              <input
-                type="password"
-                placeholder="تێپەڕەوشەی باکئەپ بنووسە…"
-                value={backupSecret}
-                onChange={(e) => setBackupSecret(e.target.value)}
-                style={{ flex: "1 1 200px", minHeight: "2.2rem" }}
-              />
-              <button
-                type="button"
-                className="primary"
-                onClick={handleDownloadBackup}
-                style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
-              >
-                داگرتنی باکئەپ
-              </button>
-              <button
-                type="button"
-                className="danger"
-                onClick={handleResetDatabase}
-                style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
-              >
-                ⚠️ سفرکردنەوەی داتابەیس
-              </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: "600px", marginBottom: "1.25rem" }}>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  type="password"
+                  placeholder="تێپەڕەوشەی باکئەپ بنووسە…"
+                  value={backupSecret}
+                  onChange={(e) => setBackupSecret(e.target.value)}
+                  style={{ flex: "1 1 200px", minHeight: "2.2rem" }}
+                />
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={handleResetDatabase}
+                  style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
+                >
+                  ⚠️ سفرکردنەوەی گشتی
+                </button>
+              </div>
+              
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => handleDownloadBackup("db")}
+                  style={{ minHeight: "2.2rem", flex: "1 1 150px" }}
+                >
+                  💾 باکئەپی گشتی (SQLite)
+                </button>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => handleDownloadBackup("gazxana")}
+                  style={{ minHeight: "2.2rem", flex: "1 1 150px", background: "#3b82f6" }}
+                >
+                  📝 باکئەپی گازخانە (JSON)
+                </button>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => handleDownloadBackup("tires")}
+                  style={{ minHeight: "2.2rem", flex: "1 1 150px", background: "#8b5cf6" }}
+                >
+                  🚗 باکئەپی تایە (JSON)
+                </button>
+              </div>
             </div>
             
             <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "1rem 0" }} />
             
             <h4 style={{ margin: "0 0 0.5rem 0", color: "var(--text)" }}>گەڕاندنەوەی داتابەیس لە باکئەپ (Restore Backup)</h4>
             <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "0.75rem" }}>
-              فایلی باکئەپی دابەزێنراو (`.sqlite`) هەڵبژێرە و تێپەڕەوشەی باکئەپەکە لە سەرەوە بنووسە بۆ گەڕاندنەوەی سەرجەم حیساباتەکانت.
+              فایلی باکئەپی دابەزێنراو (`.sqlite` یان `.json`) هەڵبژێرە و تێپەڕەوشەی باکئەپەکە لە سەرەوە بنووسە بۆ گەڕاندنەوەی سەرجەم حیساباتەکانت.
             </p>
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", maxWidth: "550px" }}>
               <input
                 type="file"
-                accept=".sqlite"
+                accept=".sqlite,.json"
                 id="restore-file-input"
                 style={{ flex: "1 1 200px", fontSize: "0.85rem", padding: "0.35rem" }}
               />

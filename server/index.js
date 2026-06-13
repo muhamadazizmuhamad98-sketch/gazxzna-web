@@ -198,15 +198,39 @@ function adminOrUser(req, res, next) {
 
 app.use(authMiddleware);
 
-// ─── باکئەپی داتابەیس (Secure SQLite Backup) ───
+// ─── باکئەپی داتابەیس (Secure SQLite / JSON Backup) ───
 app.get("/api/admin/backup-db", adminOnly, (req, res) => {
   const secretKey = req.query.secret || "";
   const expectedSecret = process.env.BACKUP_SECRET || "gazxana1234";
+  const type = req.query.type || "db"; // db, gazxana, tires
   
   if (!secretKey || secretKey !== expectedSecret) {
     return res.status(403).json({ error: "تێپەڕەوشەی باکئەپ هەڵەیە" });
   }
   
+  if (type === "gazxana") {
+    const debtors = db.prepare("SELECT * FROM debtors").all();
+    const transactions = db.prepare("SELECT * FROM transactions").all();
+    const expenses = db.prepare("SELECT * FROM expenses").all();
+    
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", "attachment; filename=gazxana_regular_backup.json");
+    return res.json({ type: "gazxana", debtors, transactions, expenses });
+  }
+  
+  if (type === "tires") {
+    const tires_inventory = db.prepare("SELECT * FROM tires_inventory").all();
+    const tire_customers = db.prepare("SELECT * FROM tire_customers").all();
+    const tire_sales = db.prepare("SELECT * FROM tire_sales").all();
+    const tire_sale_items = db.prepare("SELECT * FROM tire_sale_items").all();
+    const tire_payments = db.prepare("SELECT * FROM tire_payments").all();
+    const tire_expenses = db.prepare("SELECT * FROM tire_expenses").all();
+    
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", "attachment; filename=gazxana_tires_backup.json");
+    return res.json({ type: "tires", tires_inventory, tire_customers, tire_sales, tire_sale_items, tire_payments, tire_expenses });
+  }
+
   const dbPath = path.join(__dirname, "..", "data", "gazxana.sqlite");
   if (!fs.existsSync(dbPath)) {
     return res.status(404).json({ error: "داتابەیس نەدۆزرایەوە" });
@@ -230,7 +254,6 @@ app.post("/api/admin/reset-db", adminOnly, (req, res) => {
   
   try {
     db.transaction(() => {
-      // Temporarily disable foreign keys to allow cascading/ordered cleanup
       db.pragma("foreign_keys = OFF");
       db.prepare("DELETE FROM tire_sale_items").run();
       db.prepare("DELETE FROM tire_sales").run();
@@ -250,8 +273,15 @@ app.post("/api/admin/reset-db", adminOnly, (req, res) => {
   }
 });
 
-// ─── گەڕاندنەوەی داتابەیس لە باکئەپەوە (Restore SQLite Database from Backup) ───
-app.post("/api/admin/restore-db", adminOnly, express.raw({ type: '*/*', limit: '100mb' }), (req, res) => {
+// ─── گەڕاندنەوەی داتابەیس لە باکئەپەوە (Restore SQLite / JSON Database Backup) ───
+app.post("/api/admin/restore-db", adminOnly, (req, res, next) => {
+  const contentType = req.headers["content-type"] || "";
+  if (contentType.includes("application/json")) {
+    express.json({ limit: "100mb" })(req, res, next);
+  } else {
+    express.raw({ type: '*/*', limit: '100mb' })(req, res, next);
+  }
+}, (req, res) => {
   const secretKey = req.query.secret || "";
   const expectedSecret = process.env.BACKUP_SECRET || "gazxana1234";
   
@@ -259,27 +289,161 @@ app.post("/api/admin/restore-db", adminOnly, express.raw({ type: '*/*', limit: '
     return res.status(403).json({ error: "تێپەڕەوشەی باکئەپ هەڵەیە" });
   }
 
+  // Handle JSON Restore
+  if (req.headers["content-type"]?.includes("application/json")) {
+    const data = req.body;
+    if (!data || !data.type) {
+      return res.status(400).json({ error: "فایلی باکئەپ نادروستە" });
+    }
+
+    if (data.type === "gazxana") {
+      try {
+        db.transaction(() => {
+          db.pragma("foreign_keys = OFF");
+          db.prepare("DELETE FROM transactions").run();
+          db.prepare("DELETE FROM debtors").run();
+          db.prepare("DELETE FROM expenses").run();
+
+          if (Array.isArray(data.debtors)) {
+            const insertDebtor = db.prepare(`
+              INSERT INTO debtors (id, name, phone, note, created_at)
+              VALUES (?, ?, ?, ?, ?)
+            `);
+            data.debtors.forEach(d => {
+              insertDebtor.run(d.id, d.name, d.phone, d.note, d.created_at);
+            });
+          }
+
+          if (Array.isArray(data.transactions)) {
+            const insertTxn = db.prepare(`
+              INSERT INTO transactions (id, debtor_id, txn_date, currency_kind, txn_type, debt_usd, payment_usd, debt_iqd, note, profit_usd, profit_iqd, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            data.transactions.forEach(t => {
+              insertTxn.run(
+                t.id, t.debtor_id, t.txn_date, t.currency_kind, t.txn_type,
+                t.debt_usd, t.payment_usd, t.debt_iqd, t.note, t.profit_usd, t.profit_iqd, t.created_at
+              );
+            });
+          }
+
+          if (Array.isArray(data.expenses)) {
+            const insertExpense = db.prepare(`
+              INSERT INTO expenses (id, title, category, amount_usd, amount_iqd, expense_date, note, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            data.expenses.forEach(e => {
+              insertExpense.run(e.id, e.title, e.category, e.amount_usd, e.amount_iqd, e.expense_date, e.note, e.created_at);
+            });
+          }
+
+          db.pragma("foreign_keys = ON");
+        })();
+        return res.json({ ok: true, message: "باکئەپی بەشی گازخانە بە سەرکەوتوویی گەڕێندرایەوە." });
+      } catch (err) {
+        console.error("Restore regular data error:", err);
+        return res.status(500).json({ error: "خەتایەک لە گەڕاندنەوەی داتای گازخانە ڕوویدا" });
+      }
+    }
+
+    if (data.type === "tires") {
+      try {
+        db.transaction(() => {
+          db.pragma("foreign_keys = OFF");
+          db.prepare("DELETE FROM tire_sale_items").run();
+          db.prepare("DELETE FROM tire_sales").run();
+          db.prepare("DELETE FROM tire_payments").run();
+          db.prepare("DELETE FROM tire_customers").run();
+          db.prepare("DELETE FROM tires_inventory").run();
+          db.prepare("DELETE FROM tire_expenses").run();
+
+          if (Array.isArray(data.tires_inventory)) {
+            const insertTire = db.prepare(`
+              INSERT INTO tires_inventory (id, name, size, quantity, purchase_price_usd, sale_price_usd, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `);
+            data.tires_inventory.forEach(t => {
+              insertTire.run(t.id, t.name, t.size, t.quantity, t.purchase_price_usd, t.sale_price_usd, t.created_at);
+            });
+          }
+
+          if (Array.isArray(data.tire_customers)) {
+            const insertCust = db.prepare(`
+              INSERT INTO tire_customers (id, name, phone, note, initial_balance_usd, created_at)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `);
+            data.tire_customers.forEach(c => {
+              insertCust.run(c.id, c.name, c.phone, c.note, c.initial_balance_usd, c.created_at);
+            });
+          }
+
+          if (Array.isArray(data.tire_sales)) {
+            const insertSale = db.prepare(`
+              INSERT INTO tire_sales (id, customer_id, sale_date, payment_type, total_usd, total_iqd, paid_usd, paid_iqd, note, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            data.tire_sales.forEach(s => {
+              insertSale.run(s.id, s.customer_id, s.sale_date, s.payment_type, s.total_usd, s.total_iqd, s.paid_usd, s.paid_iqd, s.note, s.created_at);
+            });
+          }
+
+          if (Array.isArray(data.tire_sale_items)) {
+            const insertItem = db.prepare(`
+              INSERT INTO tire_sale_items (id, sale_id, tire_id, quantity, price_usd, price_iqd)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `);
+            data.tire_sale_items.forEach(i => {
+              insertItem.run(i.id, i.sale_id, i.tire_id, i.quantity, i.price_usd, i.price_iqd);
+            });
+          }
+
+          if (Array.isArray(data.tire_payments)) {
+            const insertPay = db.prepare(`
+              INSERT INTO tire_payments (id, customer_id, payment_date, amount_usd, amount_iqd, note, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `);
+            data.tire_payments.forEach(p => {
+              insertPay.run(p.id, p.customer_id, p.payment_date, p.amount_usd, p.amount_iqd, p.note, p.created_at);
+            });
+          }
+
+          if (Array.isArray(data.tire_expenses)) {
+            const insertExp = db.prepare(`
+              INSERT INTO tire_expenses (id, title, amount_iqd, expense_date, note, created_at)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `);
+            data.tire_expenses.forEach(e => {
+              insertExp.run(e.id, e.title, e.amount_iqd, e.expense_date, e.note, e.created_at);
+            });
+          }
+
+          db.pragma("foreign_keys = ON");
+        })();
+        return res.json({ ok: true, message: "باکئەپی بەشی تایە بە سەرکەوتوویی گەڕێندرایەوە." });
+      } catch (err) {
+        console.error("Restore tire data error:", err);
+        return res.status(500).json({ error: "خەتایەک لە گەڕاندنەوەی داتای بەشی تایە ڕوویدا" });
+      }
+    }
+
+    return res.status(400).json({ error: "جۆری باکئەپ نەناسراوە" });
+  }
+
+  // Handle Binary sqlite database restore
   if (!req.body || !Buffer.isBuffer(req.body) || req.body.length === 0) {
     return res.status(400).json({ error: "پێویستە فایلی داتابەیس بنێریت" });
   }
 
-  // Verify SQLite file signature (starts with "SQLite format 3\0")
   const header = req.body.toString("ascii", 0, 15);
   if (!header.startsWith("SQLite format 3")) {
     return res.status(400).json({ error: "فایلەکە داتابەیسی دروستی SQLite نییە" });
   }
 
   try {
-    // 1. Close current connection
     db.close();
-    
-    // 2. Overwrite file
     const dbPath = path.join(__dirname, "..", "data", "gazxana.sqlite");
     fs.writeFileSync(dbPath, req.body);
-    
-    // 3. Response and exit (auto-restart by PM2/Railway)
     res.json({ ok: true, message: "داتابەیس بە سەرکەوتوویی گەڕێندرایەوە. سێرڤەر ڕیستارت دەبێتەوە..." });
-    
     setTimeout(() => {
       process.exit(0);
     }, 1000);
