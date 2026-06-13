@@ -250,6 +250,45 @@ app.post("/api/admin/reset-db", adminOnly, (req, res) => {
   }
 });
 
+// ─── گەڕاندنەوەی داتابەیس لە باکئەپەوە (Restore SQLite Database from Backup) ───
+app.post("/api/admin/restore-db", adminOnly, express.raw({ type: '*/*', limit: '100mb' }), (req, res) => {
+  const secretKey = req.query.secret || "";
+  const expectedSecret = process.env.BACKUP_SECRET || "gazxana1234";
+  
+  if (!secretKey || secretKey !== expectedSecret) {
+    return res.status(403).json({ error: "تێپەڕەوشەی باکئەپ هەڵەیە" });
+  }
+
+  if (!req.body || !Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error: "پێویستە فایلی داتابەیس بنێریت" });
+  }
+
+  // Verify SQLite file signature (starts with "SQLite format 3\0")
+  const header = req.body.toString("ascii", 0, 15);
+  if (!header.startsWith("SQLite format 3")) {
+    return res.status(400).json({ error: "فایلەکە داتابەیسی دروستی SQLite نییە" });
+  }
+
+  try {
+    // 1. Close current connection
+    db.close();
+    
+    // 2. Overwrite file
+    const dbPath = path.join(__dirname, "..", "data", "gazxana.sqlite");
+    fs.writeFileSync(dbPath, req.body);
+    
+    // 3. Response and exit (auto-restart by PM2/Railway)
+    res.json({ ok: true, message: "داتابەیس بە سەرکەوتوویی گەڕێندرایەوە. سێرڤەر ڕیستارت دەبێتەوە..." });
+    
+    setTimeout(() => {
+      process.exit(0);
+    }, 1000);
+  } catch (err) {
+    console.error("Database restore error:", err);
+    res.status(500).json({ error: "گەڕاندنەوەی داتابەیس سەرنەکەوت" });
+  }
+});
+
 // ─── بەڕێوەبردنی بەکارهێنەران (تەنها ئادمین) ───
 app.get("/api/admin/users", adminOnly, (req, res) => {
   const users = getAllUsers().map(u => ({

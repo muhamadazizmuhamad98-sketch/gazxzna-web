@@ -501,6 +501,66 @@ export default function App() {
     }
   }
 
+  async function handleRestoreBackup() {
+    setBackupErr("");
+    setInfoMsg("");
+    if (!backupSecret.trim()) {
+      setBackupErr("تکایە تێپەڕەوشەی باکئەپ بنووسە");
+      return;
+    }
+    
+    const fileInput = document.getElementById("restore-file-input");
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+      setBackupErr("تکایە فایلی باکئەپەکە (.sqlite) هەڵبژێرە.");
+      return;
+    }
+
+    const file = fileInput.files[0];
+    if (!confirm(`ئایا دڵنیای لە گەڕاندنەوەی ئەم فایلە؟ هەموو زانیارییەکانی ئێستا دەسڕێنەوە و داتاکانی ئەم فایلە جێگەی دەگرنەوە.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target.result;
+          const r = await fetch(`${API}/admin/restore-db?secret=${encodeURIComponent(backupSecret)}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/octet-stream"
+            },
+            body: arrayBuffer
+          });
+          const raw = await r.text();
+          if (!r.ok) {
+            let errorMsg = "گەڕاندنەوەی داتا سەرنەکەوت";
+            try {
+              errorMsg = JSON.parse(raw).error || errorMsg;
+            } catch (_) {}
+            setBackupErr(errorMsg);
+            setLoading(false);
+            return;
+          }
+          setBackupSecret("");
+          fileInput.value = "";
+          setInfoMsg("داتابەیس بە سەرکەوتوویی گەڕێندرایەوە! سیستەمەکە دوای ٣ چرکە نوێ دەبێتەوە.");
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+        } catch (ex) {
+          setBackupErr(String(ex?.message || ex));
+          setLoading(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (ex) {
+      setBackupErr(String(ex?.message || ex));
+      setLoading(false);
+    }
+  }
+
   /* ─── سێستەمی لۆگین و لۆگئاوت ─── */
   useEffect(() => {
     const handleAuthError = () => {
@@ -2655,10 +2715,10 @@ export default function App() {
             <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
               لێرەوە دەتوانیت کۆپییەکی تەواوی داتابەیسی سیستەمەکە (`gazxana.sqlite`) دابەزێنیتە سەر کۆمپیوتەرەکەت بۆ پاراستنی حیساباتەکانت.
             </p>
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", maxWidth: "550px" }}>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", maxWidth: "550px", marginBottom: "1.25rem" }}>
               <input
                 type="password"
-                placeholder="تێپەڕەوشە بنووسە…"
+                placeholder="تێپەڕەوشەی باکئەپ بنووسە…"
                 value={backupSecret}
                 onChange={(e) => setBackupSecret(e.target.value)}
                 style={{ flex: "1 1 200px", minHeight: "2.2rem" }}
@@ -2680,7 +2740,30 @@ export default function App() {
                 ⚠️ سفرکردنەوەی داتابەیس
               </button>
             </div>
-            {backupErr ? <p style={{ color: "var(--owe)", fontSize: "0.85rem", marginTop: "0.5rem" }}>{backupErr}</p> : null}
+            
+            <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "1rem 0" }} />
+            
+            <h4 style={{ margin: "0 0 0.5rem 0", color: "var(--text)" }}>گەڕاندنەوەی داتابەیس لە باکئەپ (Restore Backup)</h4>
+            <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "0.75rem" }}>
+              فایلی باکئەپی دابەزێنراو (`.sqlite`) هەڵبژێرە و تێپەڕەوشەی باکئەپەکە لە سەرەوە بنووسە بۆ گەڕاندنەوەی سەرجەم حیساباتەکانت.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", maxWidth: "550px" }}>
+              <input
+                type="file"
+                accept=".sqlite"
+                id="restore-file-input"
+                style={{ flex: "1 1 200px", fontSize: "0.85rem", padding: "0.35rem" }}
+              />
+              <button
+                type="button"
+                className="primary"
+                onClick={handleRestoreBackup}
+                style={{ minHeight: "2.2rem", padding: "0 1.5rem", background: "var(--accent)" }}
+              >
+                📥 گەڕاندنەوەی داتا
+              </button>
+            </div>
+            {backupErr ? <p style={{ color: "var(--owe)", fontSize: "0.85rem", marginTop: "0.75rem" }}>{backupErr}</p> : null}
           </section>
         </div>
       ) : null}
