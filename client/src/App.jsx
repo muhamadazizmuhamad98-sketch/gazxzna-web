@@ -2748,41 +2748,49 @@ export default function App() {
                   onChange={(e) => setBackupSecret(e.target.value)}
                   style={{ flex: "1 1 200px", minHeight: "2.2rem" }}
                 />
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={handleResetDatabase}
-                  style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
-                >
-                  ⚠️ سفرکردنەوەی گشتی
-                </button>
+                {user?.role === "admin" && (
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={handleResetDatabase}
+                    style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
+                  >
+                    ⚠️ سفرکردنەوەی گشتی
+                  </button>
+                )}
               </div>
               
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={() => handleDownloadBackup("db")}
-                  style={{ minHeight: "2.2rem", flex: "1 1 150px" }}
-                >
-                  💾 باکئەپی گشتی (SQLite)
-                </button>
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={() => handleDownloadBackup("gazxana")}
-                  style={{ minHeight: "2.2rem", flex: "1 1 150px", background: "#3b82f6" }}
-                >
-                  📝 باکئەپی گازخانە (JSON)
-                </button>
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={() => handleDownloadBackup("tires")}
-                  style={{ minHeight: "2.2rem", flex: "1 1 150px", background: "#8b5cf6" }}
-                >
-                  🚗 باکئەپی تایە (JSON)
-                </button>
+                {user?.role === "admin" && (
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => handleDownloadBackup("db")}
+                    style={{ minHeight: "2.2rem", flex: "1 1 150px" }}
+                  >
+                    💾 باکئەپی گشتی (SQLite)
+                  </button>
+                )}
+                {(user?.role === "admin" || user?.role === "user") && (
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => handleDownloadBackup("gazxana")}
+                    style={{ minHeight: "2.2rem", flex: "1 1 150px", background: "#3b82f6" }}
+                  >
+                    📝 باکئەپی گازخانە (JSON)
+                  </button>
+                )}
+                {(user?.role === "admin" || user?.role === "tire") && (
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => handleDownloadBackup("tires")}
+                    style={{ minHeight: "2.2rem", flex: "1 1 150px", background: "#8b5cf6" }}
+                  >
+                    🚗 باکئەپی تایە (JSON)
+                  </button>
+                )}
               </div>
             </div>
             
@@ -2790,12 +2798,15 @@ export default function App() {
             
             <h4 style={{ margin: "0 0 0.5rem 0", color: "var(--text)" }}>گەڕاندنەوەی داتابەیس لە باکئەپ (Restore Backup)</h4>
             <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "0.75rem" }}>
-              فایلی باکئەپی دابەزێنراو (`.sqlite` یان `.json`) هەڵبژێرە و تێپەڕەوشەی باکئەپەکە لە سەرەوە بنووسە بۆ گەڕاندنەوەی سەرجەم حیساباتەکانت.
+              {user?.role === "admin" 
+                ? "فایلی باکئەپی دابەزێنراو (`.sqlite` یان `.json`) هەڵبژێرە و تێپەڕەوشەی باکئەپەکە لە سەرەوە بنووسە بۆ گەڕاندنەوەی سەرجەم حیساباتەکانت."
+                : "فایلی باکئەپی دابەزێنراو (`.json`) هەڵبژێرە و تێپەڕەوشەی باکئەپەکە لە سەرەوە بنووسە بۆ گەڕاندنەوەی حیساباتەکانت."
+              }
             </p>
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", maxWidth: "550px" }}>
               <input
                 type="file"
-                accept=".sqlite,.json"
+                accept={user?.role === "admin" ? ".sqlite,.json" : ".json"}
                 id="restore-file-input"
                 style={{ flex: "1 1 200px", fontSize: "0.85rem", padding: "0.35rem" }}
               />
@@ -4040,6 +4051,95 @@ export default function App() {
                 ) : (
                   <p className="muted" style={{ textAlign: "center" }}>هیچ فرۆشتنێک تۆمار نەکراوە لەم بەروارەدا.</p>
                 )}
+              </section>
+
+              {/* بەشی باکئەپی داتابەیس بۆ بەشی تایە */}
+              <section className="card card-compact" style={{ marginTop: "1.5rem" }}>
+                <h3>باکئەپ و پاراستنی داتاکان (SQLite / JSON Backup)</h3>
+                <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
+                  لێرەوە دەتوانیت باکئەپی گشتی یان باکئەپی تایبەت بە هەر بەشێک جیا بکەیتەوە و دایبەزێنیتە سەر کۆمپیوتەرەکەت.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: "600px", marginBottom: "1.25rem" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      type="password"
+                      placeholder="تێپەڕەوشەی باکئەپ بنووسە…"
+                      value={backupSecret}
+                      onChange={(e) => setBackupSecret(e.target.value)}
+                      style={{ flex: "1 1 200px", minHeight: "2.2rem" }}
+                    />
+                    {user?.role === "admin" && (
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={handleResetDatabase}
+                        style={{ minHeight: "2.2rem", padding: "0 1.2rem" }}
+                      >
+                        ⚠️ سفرکردنەوەی گشتی
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    {user?.role === "admin" && (
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => handleDownloadBackup("db")}
+                        style={{ minHeight: "2.2rem", flex: "1 1 150px" }}
+                      >
+                        💾 باکئەپی گشتی (SQLite)
+                      </button>
+                    )}
+                    {(user?.role === "admin" || user?.role === "user") && (
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => handleDownloadBackup("gazxana")}
+                        style={{ minHeight: "2.2rem", flex: "1 1 150px", background: "#3b82f6" }}
+                      >
+                        📝 باکئەپی گازخانە (JSON)
+                      </button>
+                    )}
+                    {(user?.role === "admin" || user?.role === "tire") && (
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => handleDownloadBackup("tires")}
+                        style={{ minHeight: "2.2rem", flex: "1 1 150px", background: "#8b5cf6" }}
+                      >
+                        🚗 باکئەپی تایە (JSON)
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "1rem 0" }} />
+                
+                <h4 style={{ margin: "0 0 0.5rem 0", color: "var(--text)" }}>گەڕاندنەوەی داتابەیس لە باکئەپ (Restore Backup)</h4>
+                <p className="muted" style={{ fontSize: "0.85rem", marginBottom: "0.75rem" }}>
+                  {user?.role === "admin" 
+                    ? "فایلی باکئەپی دابەزێنراو (`.sqlite` یان `.json`) هەڵبژێرە و تێپەڕەوشەی باکئەپەکە لە سەرەوە بنووسە بۆ گەڕاندنەوەی سەرجەم حیساباتەکانت."
+                    : "فایلی باکئەپی دابەزێنراو (`.json`) هەڵبژێرە و تێپەڕەوشەی باکئەپەکە لە سەرەوە بنووسە بۆ گەڕاندنەوەی حیساباتەکانت."
+                  }
+                </p>
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", maxWidth: "550px" }}>
+                  <input
+                    type="file"
+                    accept={user?.role === "admin" ? ".sqlite,.json" : ".json"}
+                    id="restore-file-input"
+                    style={{ flex: "1 1 200px", fontSize: "0.85rem", padding: "0.35rem" }}
+                  />
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={handleRestoreBackup}
+                    style={{ minHeight: "2.2rem", padding: "0 1.5rem", background: "var(--accent)" }}
+                  >
+                    📥 گەڕاندنەوەی داتا
+                  </button>
+                </div>
+                {backupErr ? <p style={{ color: "var(--owe)", fontSize: "0.85rem", marginTop: "0.75rem" }}>{backupErr}</p> : null}
               </section>
             </>
           ) : null}
