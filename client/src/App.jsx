@@ -4437,7 +4437,25 @@ export default function App() {
                                 <button type="button" className="ghost compact" onClick={() => setExportSellForm({ id: null, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" })} style={{ padding: "2px 5px", fontSize: "0.85rem" }}>پاشگەزبوونەوە</button>
                               </div>
                             ) : (
-                              <button type="button" className="primary compact link" onClick={() => setExportSellForm({ id: ex.id, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" })} style={{ marginEnd: "10px", color: "var(--ok)", fontWeight: "bold" }}>فرۆشتن</button>
+                              <>
+                                <button type="button" className="primary compact link" onClick={() => setExportSellForm({ id: ex.id, sell_price_per_barrel_usd: "", sell_price_per_barrel_iqd: "" })} style={{ marginEnd: "10px", color: "var(--ok)", fontWeight: "bold" }}>فرۆشتن</button>
+                                <button type="button" className="primary compact link" onClick={async () => {
+                                  if (!confirm("ئایا دڵنیایت لە ناردنی ئەم هەناردەیە بۆ حەمبار؟")) return;
+                                  const r = await fetch(`${API}/exports/${ex.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ status: "حەمبار کراوە" }),
+                                  });
+                                  if (r.ok) {
+                                    setInfoMsg("بە سەرکەوتوویی گوازرایەوە بۆ حەمبار ✅");
+                                    setTimeout(() => setInfoMsg(""), 3000);
+                                    loadGasExports();
+                                  } else {
+                                    const raw = await r.text();
+                                    setErr(parseJsonFromText(raw)?.error || "گواستنەوە سەرنەکەوت");
+                                  }
+                                }} style={{ marginEnd: "10px", color: "var(--accent)", fontWeight: "bold" }}>حەمبار کردن</button>
+                              </>
                             )
                           )}
                           <button type="button" className="danger link" onClick={async () => {
