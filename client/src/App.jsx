@@ -4190,9 +4190,9 @@ export default function App() {
                 </h3>
                 <div className="report-cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
                   <div className="rpt-card rpt-pay" style={{ borderRight: "3px solid #3b82f6", background: "rgba(59, 130, 246, 0.04)" }}>
-                    <span className="rpt-label" style={{ color: "#3b82f6" }}>سەرمایەی سەرەتایی (Initial Capital)</span>
-                    <strong style={{ color: "#3b82f6" }}>{fmtMoney(tireReport.initial_capital_usd, "usd")}</strong>
-                    <span className="rpt-sub">سەرمایەی دانراو بۆ پڕۆژەکە</span>
+                    <span className="rpt-label" style={{ color: "#3b82f6" }}>سەرمایەی گشتی (Total Capital)</span>
+                    <strong style={{ color: "#3b82f6" }}>{fmtMoney((tireReport.initial_capital_usd || 0) + (tireReport.total_profit_usd || 0), "usd")}</strong>
+                    <span className="rpt-sub">سەرمایەی سەرەتایی + قازانج</span>
                   </div>
                   <div className="rpt-card rpt-remain" style={{ borderRight: "3px solid #10b981", background: "rgba(16, 185, 129, 0.04)" }}>
                     <span className="rpt-label" style={{ color: "#10b981" }}>نەقدی ماوە (Remaining Cash)</span>
