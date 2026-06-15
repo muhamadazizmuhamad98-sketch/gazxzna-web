@@ -4194,11 +4194,6 @@ export default function App() {
                     <strong style={{ color: "#3b82f6" }}>{fmtMoney((tireReport.initial_capital_usd || 0) + (tireReport.total_cash_usd || 0), "usd")}</strong>
                     <span className="rpt-sub">سەرمایەی سەرەتایی + پارەی وەرگیراو</span>
                   </div>
-                  <div className="rpt-card rpt-remain" style={{ borderRight: "3px solid #10b981", background: "rgba(16, 185, 129, 0.04)" }}>
-                    <span className="rpt-label" style={{ color: "#10b981" }}>نەقدی ماوە (Remaining Cash)</span>
-                    <strong style={{ color: "#10b981" }}>{fmtMoney(tireReport.calculated_cash_usd, "usd")}</strong>
-                    <span className="rpt-sub">کاش لە دەست (سەرمایە + قازانج - مخزن - قەرز)</span>
-                  </div>
                   <div className="rpt-card rpt-expense" style={{ borderRight: "3px solid #f59e0b", background: "rgba(245, 158, 11, 0.04)" }}>
                     <span className="rpt-label" style={{ color: "#f59e0b" }}>بەهای مخزن (Inventory Value)</span>
                     <strong style={{ color: "#f59e0b" }}>{fmtMoney(tireReport.stock_value_purchase_usd, "usd")}</strong>
