@@ -119,9 +119,18 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS tire_capital (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    amount_usd REAL NOT NULL DEFAULT 0 CHECK(amount_usd >= 0),
+    capital_date TEXT NOT NULL,
+    note TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_tire_sale_date ON tire_sales(sale_date);
   CREATE INDEX IF NOT EXISTS idx_tire_payment_date ON tire_payments(payment_date);
   CREATE INDEX IF NOT EXISTS idx_tire_exp_date ON tire_expenses(expense_date);
+  CREATE INDEX IF NOT EXISTS idx_tire_capital_date ON tire_capital(capital_date);
 
   /* ─── هەناردە و حەمباری گاز ─── */
   CREATE TABLE IF NOT EXISTS gas_exports (

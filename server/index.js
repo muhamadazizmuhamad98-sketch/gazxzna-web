@@ -273,6 +273,7 @@ app.post("/api/admin/reset-db", adminOnly, (req, res) => {
       db.prepare("DELETE FROM debtors").run();
       db.prepare("DELETE FROM expenses").run();
       db.prepare("DELETE FROM tire_expenses").run();
+      db.prepare("DELETE FROM tire_capital").run();
       db.prepare("DELETE FROM gas_storage").run();
       db.prepare("DELETE FROM gas_exports").run();
       db.pragma("foreign_keys = ON");
@@ -1268,6 +1269,9 @@ app.get("/api/tire-reports/summary", adminOrTire, (req, res) => {
   const tireExpSum = db.prepare(tireExpSql).get(...tireExpParams);
   const totalExpensesIqd = tireExpSum.total_expenses_iqd || 0;
 
+  const totalCapitalResult = db.prepare("SELECT COALESCE(SUM(amount_usd), 0) AS total FROM tire_capital").get();
+  const totalCapitalUsd = 30000.0 + (totalCapitalResult.total || 0);
+
   res.json({
     total_sales_usd: sales.total_sales_usd,
     total_sales_iqd: sales.total_sales_iqd,
@@ -1281,8 +1285,8 @@ app.get("/api/tire-reports/summary", adminOrTire, (req, res) => {
     popular_tires: popularTires,
     total_profit_usd: totalProfitUsd,
     total_expenses_iqd: totalExpensesIqd,
-    initial_capital_usd: 30000.0,
-    calculated_cash_usd: 30000.0 + totalProfitUsd - (stock.stock_value_purchase_usd || 0) - outstandingDebtUsd
+    initial_capital_usd: totalCapitalUsd,
+    calculated_cash_usd: totalCapitalUsd + totalProfitUsd - (stock.stock_value_purchase_usd || 0) - outstandingDebtUsd
   });
 });
 
@@ -1421,6 +1425,50 @@ app.delete("/api/tire-expenses/:id", adminOrTire, (req, res) => {
   } catch (err) {
     console.error("Error deleting tire expense:", err);
     res.status(500).json({ error: "سڕینەوەی مسروف سەرنەکەوت" });
+  }
+});
+
+// ─── سەرمایەی تایە (Tire Capital) ───
+app.get("/api/tire-capital", adminOrTire, (req, res) => {
+  try {
+    const rows = db.prepare("SELECT * FROM tire_capital ORDER BY capital_date DESC, id DESC").all();
+    res.json(rows);
+  } catch (err) {
+    console.error("Error loading tire capital:", err);
+    res.status(500).json({ error: "کێشەیەک ڕوویدا لە خوێندنەوەی سەرمایە" });
+  }
+});
+
+app.post("/api/tire-capital", adminOrTire, (req, res) => {
+  const amount_usd = Number(req.body?.amount_usd) || 0;
+  const capital_date = String(req.body?.capital_date ?? "").trim();
+  const note = String(req.body?.note ?? "").trim();
+
+  if (amount_usd <= 0) return res.status(400).json({ error: "بڕی سەرمایە دەبێت لە صفر گەورەتر بێت" });
+  if (!capital_date) return res.status(400).json({ error: "ڕێکەوت پێویستە" });
+
+  try {
+    const info = db.prepare(`
+      INSERT INTO tire_capital (amount_usd, capital_date, note)
+      VALUES (?, ?, ?)
+    `).run(amount_usd, capital_date, note);
+    const row = db.prepare("SELECT * FROM tire_capital WHERE id = ?").get(info.lastInsertRowid);
+    res.status(201).json(row);
+  } catch (err) {
+    console.error("Error adding tire capital:", err);
+    res.status(500).json({ error: "تۆمارکردنی سەرمایە سەرنەکەوت" });
+  }
+});
+
+app.delete("/api/tire-capital/:id", adminOrTire, (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    const info = db.prepare("DELETE FROM tire_capital WHERE id = ?").run(id);
+    if (info.changes === 0) return res.status(404).json({ error: "سەرمایەکە نەدۆزرایەوە" });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error deleting tire capital:", err);
+    res.status(500).json({ error: "سڕینەوەی سەرمایە سەرنەکەوت" });
   }
 });
 

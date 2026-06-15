@@ -307,6 +307,8 @@ export default function App() {
   const [tireReportFrom, setTireReportFrom] = useState("");
   const [tireReportTo, setTireReportTo] = useState("");
   const [tireReportLoading, setTireReportLoading] = useState(false);
+  const [tireCapitals, setTireCapitals] = useState([]);
+  const [capitalForm, setCapitalForm] = useState({ amount_usd: "", capital_date: today, note: "" });
 
   /* ─── فرۆشراوەکان state ─── */
   const [soldItems, setSoldItems] = useState(null);
@@ -399,6 +401,52 @@ export default function App() {
       setTireReportLoading(false);
     }
   }, [tireReportFrom, tireReportTo, token, user]);
+
+  const loadTireCapitals = useCallback(async () => {
+    if (!token || !user || user.role === "user") return;
+    const r = await fetch(`${API}/tire-capital`);
+    if (r.ok) setTireCapitals(await r.json());
+  }, [token, user]);
+
+  async function submitTireCapital(e) {
+    e.preventDefault();
+    setErr("");
+    try {
+      const r = await fetch(`${API}/tire-capital`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(capitalForm)
+      });
+      const raw = await r.text();
+      if (!r.ok) {
+        setErr(parseJsonFromText(raw)?.error || "تۆمارکردنی سەرمایە سەرنەکەوت");
+        return;
+      }
+      setCapitalForm({ amount_usd: "", capital_date: today, note: "" });
+      setInfoMsg("سەرمایە بە سەرکەوتوویی زیادکرا ✅");
+      setTimeout(() => setInfoMsg(""), 3000);
+      loadTireCapitals();
+      loadTireReport();
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
+
+  async function deleteTireCapital(id) {
+    if (!confirm("ئایا دڵنیایت لە سڕینەوەی ئەم بڕە سەرمایەیە؟")) return;
+    setErr("");
+    try {
+      const r = await fetch(`${API}/tire-capital/${id}`, { method: "DELETE" });
+      if (r.ok) {
+        loadTireCapitals();
+        loadTireReport();
+      } else {
+        setErr("سڕینەوەی سەرمایە سەرنەکەوت");
+      }
+    } catch (ex) {
+      setErr(String(ex?.message || ex));
+    }
+  }
 
   const loadSoldItems = useCallback(async () => {
     if (!token || !user || user.role === "user") return;
@@ -834,6 +882,7 @@ export default function App() {
       loadTireSales();
     } else if (tab === "tire_reports") {
       loadTireReport();
+      loadTireCapitals();
     } else if (tab === "tire_sold_items") {
       loadSoldItems();
     } else if (tab === "tire_expenses") {
@@ -845,7 +894,7 @@ export default function App() {
     } else if (tab === "export_reports") {
       loadExportReport();
     }
-  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport, loadSoldItems, loadTireExpenses, loadGasExports, loadGasStorage, loadExportReport]);
+  }, [tab, loadTires, loadTireCustomers, loadTireSales, loadTirePayments, loadTireReport, loadTireCapitals, loadSoldItems, loadTireExpenses, loadGasExports, loadGasStorage, loadExportReport]);
 
   /* بارکردنی مسروفاتی تایە کاتێک فلتەرەکان دەگۆڕێن */
   useEffect(() => {
@@ -4186,6 +4235,93 @@ export default function App() {
                       ? "✓ هاوکێشەی دارایی هاوسەنگە" 
                       : "✗ هاوکێشەکە هاوسەنگ نییە"}
                   </span>
+                </div>
+              </section>
+
+              {/* کۆنتڕۆڵی سەرمایە (Capital Ledger Card) */}
+              <section className="card" aria-labelledby="rpt-capital-heading" style={{ marginTop: "1.5rem" }}>
+                <h3 id="rpt-capital-heading" style={{ marginBottom: "1rem", color: "var(--primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  💰 بەڕێوەبردن و زیادکردنی سەرمایە (Capital Management)
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "1.5rem", alignItems: "start" }}>
+                  {/* لای چەپ: فۆڕم */}
+                  <div>
+                    <h4 style={{ marginTop: 0, marginBottom: "0.75rem" }}>زیادکردنی سەرمایەی نوێ</h4>
+                    <form className="grid-form" onSubmit={submitTireCapital} style={{ gap: "0.75rem" }}>
+                      <label className="span2" style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        بڕی پارەی زیادکراو بە دۆلار ($)
+                        <input
+                          type="number"
+                          step="any"
+                          value={capitalForm.amount_usd}
+                          onChange={(e) => setCapitalForm({ ...capitalForm, amount_usd: e.target.value })}
+                          placeholder="0.00"
+                          required
+                          style={{ minHeight: "2.2rem" }}
+                        />
+                      </label>
+                      <label className="span2" style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        ڕێکەوت
+                        <input
+                          type="date"
+                          value={capitalForm.capital_date}
+                          onChange={(e) => setCapitalForm({ ...capitalForm, capital_date: e.target.value })}
+                          required
+                          style={{ minHeight: "2.2rem" }}
+                        />
+                      </label>
+                      <label className="span2" style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        تێبینی
+                        <input
+                          value={capitalForm.note}
+                          onChange={(e) => setCapitalForm({ ...capitalForm, note: e.target.value })}
+                          placeholder="ئیختیاری"
+                          style={{ minHeight: "2.2rem" }}
+                        />
+                      </label>
+                      <button type="submit" className="primary span2" style={{ minHeight: "2.2rem" }}>
+                        پارە بخەرە سەر سەرمایە
+                      </button>
+                    </form>
+                  </div>
+                  {/* لای ڕاست: لیست */}
+                  <div>
+                    <h4 style={{ marginTop: 0, marginBottom: "0.75rem" }}>مێژووی سەرمایە زیادکراوەکان</h4>
+                    <div className="table-wrap" style={{ maxHeight: "300px", overflowY: "auto" }}>
+                      <table className="data compact">
+                        <thead>
+                          <tr>
+                            <th>ڕێکەوت</th>
+                            <th>بڕ ($)</th>
+                            <th>تێبینی</th>
+                            <th>کردار</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* ڕێزی سەرەتایی جێگیر */}
+                          <tr>
+                            <td className="muted">سەرەتایی</td>
+                            <td className="num" style={{ fontWeight: "700" }}>{fmtMoney(30000.0, "usd")}</td>
+                            <td className="muted">سەرمایەی سەرەتایی دامەزراندن</td>
+                            <td>—</td>
+                          </tr>
+                          {/* تۆمارەکانی تر */}
+                          {tireCapitals.map((cap) => (
+                            <tr key={cap.id}>
+                              <td>{cap.capital_date}</td>
+                              <td className="num" style={{ color: "var(--ok)", fontWeight: "700" }}>{fmtMoney(cap.amount_usd, "usd")}</td>
+                              <td className="muted">{cap.note || "—"}</td>
+                              <td>
+                                <button type="button" className="danger link" onClick={() => deleteTireCapital(cap.id)}>
+                                  سڕینەوە
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </section>
 
