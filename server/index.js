@@ -1270,7 +1270,7 @@ app.get("/api/tire-reports/summary", adminOrTire, (req, res) => {
   const totalExpensesIqd = tireExpSum.total_expenses_iqd || 0;
 
   const totalCapitalResult = db.prepare("SELECT COALESCE(SUM(amount_usd), 0) AS total FROM tire_capital").get();
-  const totalCapitalUsd = 30000.0 + (totalCapitalResult.total || 0);
+  const totalCapitalUsd = totalCapitalResult.total || 0;
 
   res.json({
     total_sales_usd: sales.total_sales_usd,

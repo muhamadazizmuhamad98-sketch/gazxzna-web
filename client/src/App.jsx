@@ -4298,13 +4298,6 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {/* ڕێزی سەرەتایی جێگیر */}
-                          <tr>
-                            <td className="muted">سەرەتایی</td>
-                            <td className="num" style={{ fontWeight: "700" }}>{fmtMoney(30000.0, "usd")}</td>
-                            <td className="muted">سەرمایەی سەرەتایی دامەزراندن</td>
-                            <td>—</td>
-                          </tr>
                           {/* تۆمارەکانی تر */}
                           {tireCapitals.map((cap) => (
                             <tr key={cap.id}>

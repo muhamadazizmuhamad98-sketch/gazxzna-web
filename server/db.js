@@ -212,5 +212,19 @@ try {
   console.error("Failed to run transactions migration:", err);
 }
 
+// Seed default initial capital of $30,000 if table is empty
+try {
+  const capCount = db.prepare("SELECT COUNT(*) AS cnt FROM tire_capital").get();
+  if (capCount && capCount.cnt === 0) {
+    db.prepare(`
+      INSERT INTO tire_capital (amount_usd, capital_date, note)
+      VALUES (30000.0, '2026-06-15', 'سەرمایەی سەرەتایی دامەزراندن')
+    `).run();
+    console.log("Seeded initial capital of $30,000 successfully.");
+  }
+} catch (err) {
+  console.error("Failed to seed initial capital:", err);
+}
+
 module.exports = { db };
 
