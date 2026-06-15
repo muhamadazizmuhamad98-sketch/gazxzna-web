@@ -4134,6 +4134,61 @@ export default function App() {
                 </div>
               </div>
 
+              {/* تەرازوی دارایی (Financial Balance Sheet) */}
+              <section className="card" style={{ marginTop: "1.5rem" }}>
+                <h3 style={{ marginBottom: "1rem", color: "var(--primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  📊 تەرازوی گشتی دارایی (Balance Sheet)
+                </h3>
+                <div className="report-cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+                  <div className="rpt-card rpt-pay" style={{ borderRight: "3px solid #3b82f6", background: "rgba(59, 130, 246, 0.04)" }}>
+                    <span className="rpt-label" style={{ color: "#3b82f6" }}>سەرمایەی سەرەتایی (Initial Capital)</span>
+                    <strong style={{ color: "#3b82f6" }}>{fmtMoney(tireReport.initial_capital_usd, "usd")}</strong>
+                    <span className="rpt-sub">سەرمایەی دانراو بۆ پڕۆژەکە</span>
+                  </div>
+                  <div className="rpt-card rpt-remain" style={{ borderRight: "3px solid #10b981", background: "rgba(16, 185, 129, 0.04)" }}>
+                    <span className="rpt-label" style={{ color: "#10b981" }}>نەقدی ماوە (Remaining Cash)</span>
+                    <strong style={{ color: "#10b981" }}>{fmtMoney(tireReport.calculated_cash_usd, "usd")}</strong>
+                    <span className="rpt-sub">کاش لە دەست (سەرمایە + قازانج - مخزن - قەرز)</span>
+                  </div>
+                  <div className="rpt-card rpt-expense" style={{ borderRight: "3px solid #f59e0b", background: "rgba(245, 158, 11, 0.04)" }}>
+                    <span className="rpt-label" style={{ color: "#f59e0b" }}>بەهای مخزن (Inventory Value)</span>
+                    <strong style={{ color: "#f59e0b" }}>{fmtMoney(tireReport.stock_value_purchase_usd, "usd")}</strong>
+                    <span className="rpt-sub">بەهای تێچووی کڕینی کاڵاکانی مخزن</span>
+                  </div>
+                  <div className="rpt-card rpt-debt" style={{ borderRight: "3px solid #ef4444", background: "rgba(239, 68, 68, 0.04)" }}>
+                    <span className="rpt-label" style={{ color: "#ef4444" }}>قەرزی کڕیاران (Receivable)</span>
+                    <strong style={{ color: "#ef4444" }}>{fmtMoney(tireReport.outstanding_debt_usd, "usd")}</strong>
+                    <span className="rpt-sub">کۆی ئەو پارەیەی لای کڕیارانە بە قەرز</span>
+                  </div>
+                </div>
+                
+                <div style={{ 
+                  marginTop: "1.25rem", 
+                  padding: "0.85rem 1rem", 
+                  background: "var(--pay-bg)", 
+                  borderRadius: "8px", 
+                  border: "1px solid var(--pay-border)", 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                  fontSize: "0.9rem"
+                }}>
+                  <span style={{ fontWeight: "700", color: "var(--text)" }}>
+                    هاوکێشەی هاوسەنگی: Assets ({fmtMoney((tireReport.calculated_cash_usd || 0) + (tireReport.stock_value_purchase_usd || 0) + (tireReport.outstanding_debt_usd || 0), "usd")}) = Equity ({fmtMoney((tireReport.initial_capital_usd || 0) + (tireReport.total_profit_usd || 0), "usd")})
+                  </span>
+                  <span style={{ 
+                    fontWeight: "bold", 
+                    color: Math.abs(((tireReport.calculated_cash_usd || 0) + (tireReport.stock_value_purchase_usd || 0) + (tireReport.outstanding_debt_usd || 0)) - ((tireReport.initial_capital_usd || 0) + (tireReport.total_profit_usd || 0))) < 0.1 ? "var(--ok)" : "var(--owe)" 
+                  }}>
+                    {Math.abs(((tireReport.calculated_cash_usd || 0) + (tireReport.stock_value_purchase_usd || 0) + (tireReport.outstanding_debt_usd || 0)) - ((tireReport.initial_capital_usd || 0) + (tireReport.total_profit_usd || 0))) < 0.1 
+                      ? "✓ هاوکێشەی دارایی هاوسەنگە" 
+                      : "✗ هاوکێشەکە هاوسەنگ نییە"}
+                  </span>
+                </div>
+              </section>
+
               {/* پڕفرۆشترین تایەکان */}
               <section className="card" aria-labelledby="rpt-pop-tires">
                 <h2 id="rpt-pop-tires">پڕفرۆشترین تایەکان (بەپێی ژمارەی فرۆشراو)</h2>

@@ -1280,7 +1280,9 @@ app.get("/api/tire-reports/summary", adminOrTire, (req, res) => {
     total_tires_count: stock.total_tires_count || 0,
     popular_tires: popularTires,
     total_profit_usd: totalProfitUsd,
-    total_expenses_iqd: totalExpensesIqd
+    total_expenses_iqd: totalExpensesIqd,
+    initial_capital_usd: 30000.0,
+    calculated_cash_usd: 30000.0 + totalProfitUsd - (stock.stock_value_purchase_usd || 0) - outstandingDebtUsd
   });
 });
 
