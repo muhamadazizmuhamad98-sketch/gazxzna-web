@@ -291,6 +291,9 @@ export default function App() {
     paid_usd: "",
     note: ""
   });
+  const [customerSearchText, setCustomerSearchText] = useState("");
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const [selectedCustomerName, setSelectedCustomerName] = useState("");
   
   const [tirePayments, setTirePayments] = useState([]);
   const [tirePaymentForm, setTirePaymentForm] = useState({
@@ -1262,6 +1265,12 @@ export default function App() {
         setErr(humanApiFailure(r.status, raw));
         return;
       }
+      const createdCustomer = parseJsonFromText(raw);
+      if (createdCustomer && createdCustomer.id) {
+        setSaleForm(prev => ({ ...prev, customer_id: String(createdCustomer.id) }));
+        setCustomerSearchText(createdCustomer.name);
+        setSelectedCustomerName(createdCustomer.name);
+      }
       setTireCustomerForm({ name: "", phone: "", note: "", initial_balance_usd: "" });
       setShowAddCustomerForm(false);
       await loadTireCustomers();
@@ -1439,6 +1448,8 @@ export default function App() {
         paid_usd: "",
         note: ""
       });
+      setCustomerSearchText("");
+      setSelectedCustomerName("");
       await loadTires();
       await loadTireSales();
       await loadTireCustomers();
@@ -3378,22 +3389,127 @@ export default function App() {
 
                   {saleForm.payment_type === "قەرز" ? (
                     <>
-                      <label className="span2">
-                        قەرزدار هەڵبژێرە
-                        <select
-                          value={saleForm.customer_id}
-                          onChange={(e) => setSaleForm({ ...saleForm, customer_id: e.target.value })}
-                          required
-                        >
-                          <option value="">— هەڵبژێرە —</option>
-                          {tireCustomers.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} (قەرز: {fmtMoney(c.balance_usd, "usd")})
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className="span2" style={{ marginTop: "-0.5rem" }}>
+                      {/* گەڕانی قەرزدار بەپێی ناو یان مۆبایل */}
+                      <div className="span2" style={{ position: "relative" }}>
+                        <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem", fontSize: "0.88rem", color: "var(--text)" }}>
+                          گەڕان بەپێی ناو یان مۆبایل
+                          <input
+                            type="text"
+                            value={customerSearchText}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomerSearchText(val);
+                              setCustomerDropdownOpen(true);
+                              if (!val.trim()) {
+                                setSaleForm({ ...saleForm, customer_id: "" });
+                                setSelectedCustomerName("");
+                              }
+                            }}
+                            onFocus={() => setCustomerDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => setCustomerDropdownOpen(false), 180)}
+                            placeholder="بنووسە بۆ گەڕان…  بۆ نموونە: ئەحمەد یان 0770"
+                            autoComplete="off"
+                            style={{
+                              border: saleForm.customer_id ? "2px solid var(--ok)" : "1.5px solid var(--border)",
+                              borderRadius: "6px",
+                            }}
+                          />
+                        </label>
+
+                        {/* ئەنجامەکانی گەڕان */}
+                        {customerDropdownOpen && customerSearchText.trim() && (() => {
+                          const q = customerSearchText.trim().toLowerCase();
+                          const matches = tireCustomers.filter(c =>
+                            c.name.toLowerCase().includes(q) ||
+                            (c.phone || "").toLowerCase().includes(q)
+                          );
+                          return matches.length > 0 ? (
+                            <div style={{
+                              position: "absolute",
+                              top: "100%",
+                              left: 0,
+                              right: 0,
+                              background: "var(--card)",
+                              border: "1.5px solid var(--primary)",
+                              borderRadius: "8px",
+                              boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                              zIndex: 100,
+                              maxHeight: "220px",
+                              overflowY: "auto",
+                              marginTop: "2px",
+                            }}>
+                              {matches.map(c => (
+                                <div
+                                  key={c.id}
+                                  onMouseDown={() => {
+                                    setSaleForm({ ...saleForm, customer_id: String(c.id) });
+                                    setCustomerSearchText(c.name);
+                                    setSelectedCustomerName(c.name);
+                                    setCustomerDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    padding: "0.6rem 1rem",
+                                    cursor: "pointer",
+                                    borderBottom: "1px solid var(--border)",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    gap: "0.5rem",
+                                    transition: "background 0.1s",
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = "var(--hover)"}
+                                  onMouseLeave={e => e.currentTarget.style.background = ""}
+                                >
+                                  <div>
+                                    <div style={{ fontWeight: "700", color: "var(--text)" }}>{c.name}</div>
+                                    {c.phone ? <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>📞 {c.phone}</div> : null}
+                                  </div>
+                                  <div style={{ textAlign: "left", flexShrink: 0 }}>
+                                    <div style={{ fontSize: "0.78rem", color: "var(--owe)", fontWeight: "600" }}>قەرز: {fmtMoney(c.balance_usd, "usd")}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{
+                              position: "absolute",
+                              top: "100%",
+                              left: 0,
+                              right: 0,
+                              background: "var(--card)",
+                              border: "1.5px solid var(--border)",
+                              borderRadius: "8px",
+                              padding: "0.75rem 1rem",
+                              color: "var(--muted)",
+                              fontSize: "0.85rem",
+                              zIndex: 100,
+                              marginTop: "2px",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                            }}>
+                              هیچ قەرزدارێک نەدۆزرایەوە — <strong style={{ color: "var(--primary)", cursor: "pointer" }} onMouseDown={() => { setCustomerDropdownOpen(false); setShowAddCustomerForm(true); }}>زیادی بکە ➕</strong>
+                            </div>
+                          );
+                        })()}
+
+                        {/* پیشاندانی کڕیاری هەڵبژێردراو */}
+                        {saleForm.customer_id ? (() => {
+                          const sel = tireCustomers.find(c => String(c.id) === String(saleForm.customer_id));
+                          return sel ? (
+                            <div style={{ marginTop: "0.4rem", padding: "0.5rem 0.75rem", background: "var(--pay-bg)", borderRadius: "6px", border: "1px solid var(--pay-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <span style={{ fontWeight: "700", color: "var(--text)" }}>✅ {sel.name}</span>
+                                {sel.phone ? <span style={{ marginRight: "0.5rem", color: "var(--muted)", fontSize: "0.8rem" }}> — 📞 {sel.phone}</span> : null}
+                              </div>
+                              <span style={{ color: "var(--owe)", fontWeight: "600", fontSize: "0.85rem" }}>قەرزی کۆن: {fmtMoney(sel.balance_usd, "usd")}</span>
+                            </div>
+                          ) : null;
+                        })() : null}
+
+                        {/* hidden input بۆ validation */}
+                        <input type="hidden" value={saleForm.customer_id} required />
+                      </div>
+
+                      <div className="span2" style={{ marginTop: "-0.25rem" }}>
                         <button type="button" className="ghost" style={{ width: "100%", fontSize: "0.8rem", minHeight: "2rem" }} onClick={() => setShowAddCustomerForm(!showAddCustomerForm)}>
                           {showAddCustomerForm ? "داخستنی فۆرمی زیادکردنی قەرزدار" : "➕ زیادکردنی قەرزداری نوێ بۆ ئەم بەشە"}
                         </button>
